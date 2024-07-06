@@ -1,32 +1,37 @@
 package controller
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"gorm.io/gorm"
 	"net/http"
+	"nine-dubz/app/model"
+	"strconv"
 )
 
 type RouterController struct {
-	Router              chi.Mux
-	DB                  *gorm.DB
-	MovieController     MovieController
-	RoleController      RoleController
-	ApiMethodController ApiMethodController
-	UserController      UserController
-	TokenController     TokenController
+	Router                chi.Mux
+	DB                    *gorm.DB
+	MovieController       MovieController
+	RoleController        RoleController
+	ApiMethodController   ApiMethodController
+	UserController        UserController
+	TokenController       TokenController
+	GoogleOauthController GoogleOauthController
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
 	return &RouterController{
-		Router:              *chi.NewRouter(),
-		DB:                  &db,
-		MovieController:     *NewMovieController(&db),
-		RoleController:      *NewRoleController(&db),
-		ApiMethodController: *NewApiMethodController(&db),
-		UserController:      *NewUserController(&db),
-		TokenController:     *NewTokenController("nine-dubz-token-secret"),
+		Router:                *chi.NewRouter(),
+		DB:                    &db,
+		MovieController:       *NewMovieController(&db),
+		RoleController:        *NewRoleController(&db),
+		ApiMethodController:   *NewApiMethodController(&db),
+		UserController:        *NewUserController(&db),
+		TokenController:       *NewTokenController("nine-dubz-token-secret"),
+		GoogleOauthController: *NewGoogleOauthController(),
 	}
 }
 
@@ -37,8 +42,10 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	rc.Router.Use(render.SetContentType(render.ContentTypeJSON))
 
 	rc.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World"))
+		http.ServeFile(w, r, "public/index.html")
 	})
+
+	rc.Router.Get("/authorize", rc.GoogleOauthController.Authorize)
 
 	rc.Router.Route("/api", func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
@@ -54,7 +61,7 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 		})
 		r.Route("/movie", func(r chi.Router) {
 			r.With(rc.Permission).Post("/", rc.MovieController.Add)
-			r.With(rc.Permission).Get("/", rc.MovieController.GetAll)
+			r.With(rc.Permission).With(rc.Pagination).Get("/", rc.MovieController.GetAll)
 
 			r.Route("/{movieId}", func(r chi.Router) {
 				r.With(rc.Permission).Get("/", rc.MovieController.Get)
@@ -79,6 +86,11 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 
 			r.Route("/{userId}", func(r chi.Router) {
 				r.With(rc.Permission).Get("/", rc.UserController.Get)
+			})
+		})
+		r.Route("/authorize", func(r chi.Router) {
+			r.Route("/google", func(r chi.Router) {
+				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrl)
 			})
 		})
 	})
@@ -113,6 +125,28 @@ func (rc *RouterController) Permission(next http.Handler) http.Handler {
 		}
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (rc *RouterController) Pagination(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+		if err != nil || limit <= 0 {
+			limit = -1
+		}
+
+		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+		if err != nil || offset < 0 || limit <= 0 {
+			offset = -1
+		}
+
+		pagination := &model.Pagination{
+			Limit:  limit,
+			Offset: offset,
+		}
+
+		ctx := context.WithValue(r.Context(), "pagination", pagination)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

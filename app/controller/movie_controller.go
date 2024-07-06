@@ -69,18 +69,7 @@ func (mc *MovieController) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mc *MovieController) GetAll(w http.ResponseWriter, r *http.Request) {
-	pagination := &model.Pagination{}
-	err := render.Bind(r, pagination)
-	if err != nil {
-		errResponse := &ErrResponse{
-			Err:            err,
-			HTTPStatusCode: 404,
-			StatusText:     "Invalid pagination params",
-			ErrorText:      err.Error(),
-		}
-		render.Render(w, r, errResponse)
-		return
-	}
+	pagination := r.Context().Value("pagination").(*model.Pagination)
 
 	movies, err := mc.MovieInteractor.GetAll(pagination)
 	if err != nil {

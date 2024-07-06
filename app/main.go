@@ -9,16 +9,6 @@ import (
 	"os"
 )
 
-const publicDir = "public/"
-
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, publicDir+"dist/index.html")
-}
-
-func handleAdmin(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, publicDir+"admin.html")
-}
-
 func main() {
 	appIp, ok := os.LookupEnv("APP_IP")
 	if !ok {
