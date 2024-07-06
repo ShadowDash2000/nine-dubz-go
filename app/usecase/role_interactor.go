@@ -22,6 +22,6 @@ func (ri *RoleInteractor) Get(id uint) (*model.Role, error) {
 	return ri.RoleRepository.Get(id)
 }
 
-func (ri *RoleInteractor) CheckRoutePermission(id uint, routePattern string, method string) (bool, error) {
-	return ri.RoleRepository.CheckRoutePermission(id, routePattern, method)
+func (ri *RoleInteractor) CheckRoutePermission(userName string, routePattern string, method string) (bool, error) {
+	return ri.RoleRepository.CheckRoutePermission(userName, routePattern, method)
 }

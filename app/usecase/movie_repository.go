@@ -7,4 +7,5 @@ type MovieRepository interface {
 	Remove(id uint) error
 	Update(movie *model.Movie) error
 	Get(id uint) (*model.Movie, error)
+	GetAll(pagination *model.Pagination) (*[]model.Movie, error)
 }

@@ -30,11 +30,11 @@ func main() {
 	}
 	dbLogin, ok := os.LookupEnv("DB_LOGIN")
 	if !ok {
-		appPort = "root"
+		dbLogin = "root"
 	}
 	dbPassword, ok := os.LookupEnv("DB_PASSWORD")
 	if !ok {
-		appPort = ""
+		dbPassword = ""
 	}
 
 	dsn := dbLogin + ":" + dbPassword + "@tcp(localhost:3306)/nine-dubz?charset=utf8mb4&parseTime=True&loc=Local"

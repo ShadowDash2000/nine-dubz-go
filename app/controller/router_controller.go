@@ -15,6 +15,7 @@ type RouterController struct {
 	RoleController      RoleController
 	ApiMethodController ApiMethodController
 	UserController      UserController
+	TokenController     TokenController
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
@@ -25,6 +26,7 @@ func NewRouterController(db gorm.DB) *RouterController {
 		RoleController:      *NewRoleController(&db),
 		ApiMethodController: *NewApiMethodController(&db),
 		UserController:      *NewUserController(&db),
+		TokenController:     *NewTokenController("nine-dubz-token-secret"),
 	}
 }
 
@@ -39,32 +41,44 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	})
 
 	rc.Router.Route("/api", func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				/**
+				TODO remove in future
+				*/
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+				next.ServeHTTP(w, r)
+			})
+		})
 		r.Route("/movie", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.MovieController.Add)
+			r.With(rc.Permission).Post("/", rc.MovieController.Add)
+			r.With(rc.Permission).Get("/", rc.MovieController.GetAll)
 
 			r.Route("/{movieId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.MovieController.Get)
+				r.With(rc.Permission).Get("/", rc.MovieController.Get)
 			})
 		})
 		r.Route("/role", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.RoleController.Add)
+			r.With(rc.Permission).Post("/", rc.RoleController.Add)
 
 			r.Route("/{roleId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.RoleController.Get)
+				r.With(rc.Permission).Get("/", rc.RoleController.Get)
 			})
 		})
 		r.Route("/api-method", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.ApiMethodController.Add)
+			r.With(rc.Permission).Post("/", rc.ApiMethodController.Add)
 
 			r.Route("/{apiMethodId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.ApiMethodController.Get)
+				r.With(rc.Permission).Get("/", rc.ApiMethodController.Get)
 			})
 		})
 		r.Route("/user", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.UserController.Add)
+			r.With(rc.Permission).Post("/", rc.UserController.Add)
 
 			r.Route("/{userId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.UserController.Get)
+				r.With(rc.Permission).Get("/", rc.UserController.Get)
 			})
 		})
 	})
@@ -77,12 +91,22 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	return &rc.Router
 }
 
-func (rc *RouterController) PermissionCtx(next http.Handler) http.Handler {
+func (rc *RouterController) Permission(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userName := ""
+		tokenCookie, err := r.Cookie("token")
+		if err == nil {
+			token, err := rc.TokenController.Verify(tokenCookie.String())
+			if err != nil {
+				http.Error(w, http.StatusText(403), 403)
+			}
+			userName, _ = token.Claims.GetSubject()
+		}
+
 		routePattern := chi.RouteContext(r.Context()).RoutePattern()
 		method := r.Method
 
-		isUserHavePermission, err := rc.RoleController.RoleInteractor.CheckRoutePermission(1, routePattern, method)
+		isUserHavePermission, err := rc.RoleController.RoleInteractor.CheckRoutePermission(userName, routePattern, method)
 		if err != nil || !isUserHavePermission {
 			http.Error(w, http.StatusText(403), 403)
 			return
