@@ -21,3 +21,7 @@ func (mi *MovieInteractor) Update(movie *model.Movie) error {
 func (mi *MovieInteractor) Get(id uint) (*model.Movie, error) {
 	return mi.MovieRepository.Get(id)
 }
+
+func (mi *MovieInteractor) GetAll(pagination *model.Pagination) (*[]model.Movie, error) {
+	return mi.MovieRepository.GetAll(pagination)
+}

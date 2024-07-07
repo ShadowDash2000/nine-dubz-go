@@ -1,30 +1,39 @@
 package controller
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"gorm.io/gorm"
 	"net/http"
+	"nine-dubz/app/model"
+	"strconv"
 )
 
 type RouterController struct {
-	Router              chi.Mux
-	DB                  *gorm.DB
-	MovieController     MovieController
-	RoleController      RoleController
-	ApiMethodController ApiMethodController
-	UserController      UserController
+	Router                chi.Mux
+	DB                    *gorm.DB
+	MovieController       MovieController
+	RoleController        RoleController
+	ApiMethodController   ApiMethodController
+	UserController        UserController
+	TokenController       TokenController
+	GoogleOauthController GoogleOauthController
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
+	tokenController := *NewTokenController("nine-dubz-token-secret", &db)
+
 	return &RouterController{
-		Router:              *chi.NewRouter(),
-		DB:                  &db,
-		MovieController:     *NewMovieController(&db),
-		RoleController:      *NewRoleController(&db),
-		ApiMethodController: *NewApiMethodController(&db),
-		UserController:      *NewUserController(&db),
+		Router:                *chi.NewRouter(),
+		DB:                    &db,
+		MovieController:       *NewMovieController(&db),
+		RoleController:        *NewRoleController(&db, &tokenController),
+		ApiMethodController:   *NewApiMethodController(&db),
+		UserController:        *NewUserController(&db, &tokenController),
+		TokenController:       tokenController,
+		GoogleOauthController: *NewGoogleOauthController(),
 	}
 }
 
@@ -35,36 +44,65 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	rc.Router.Use(render.SetContentType(render.ContentTypeJSON))
 
 	rc.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World"))
+		http.ServeFile(w, r, "public/index.html")
 	})
 
+	rc.Router.Get("/authorize", rc.GoogleOauthController.Authorize)
+
 	rc.Router.Route("/api", func(r chi.Router) {
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				/**
+				TODO remove in future
+				*/
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+				next.ServeHTTP(w, r)
+			})
+		})
+
 		r.Route("/movie", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.MovieController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.MovieController.Add)
+			r.With(rc.RoleController.Permission).With(rc.Pagination).Get("/", rc.MovieController.GetAll)
 
 			r.Route("/{movieId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.MovieController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.MovieController.Get)
 			})
 		})
 		r.Route("/role", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.RoleController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.RoleController.Add)
 
 			r.Route("/{roleId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.RoleController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.RoleController.Get)
 			})
 		})
 		r.Route("/api-method", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.ApiMethodController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.ApiMethodController.Add)
 
 			r.Route("/{apiMethodId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.ApiMethodController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.ApiMethodController.Get)
 			})
 		})
+
 		r.Route("/user", func(r chi.Router) {
-			r.With(rc.PermissionCtx).Post("/", rc.UserController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.UserController.Add)
+			r.With(rc.RoleController.Permission).Get("/short", rc.UserController.GetUserShort)
 
 			r.Route("/{userId}", func(r chi.Router) {
-				r.With(rc.PermissionCtx).Get("/", rc.UserController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.UserController.Get)
+			})
+
+			r.Get("/check-by-name", rc.UserController.CheckUserWithNameExists)
+		})
+
+		r.Route("/authorize", func(r chi.Router) {
+			r.Route("/google", func(r chi.Router) {
+				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrl)
+			})
+			r.Route("/inner", func(r chi.Router) {
+				r.Post("/register", rc.UserController.Register)
+				r.Post("/login", rc.UserController.Login)
 			})
 		})
 	})
@@ -77,18 +115,25 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	return &rc.Router
 }
 
-func (rc *RouterController) PermissionCtx(next http.Handler) http.Handler {
+func (rc *RouterController) Pagination(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		routePattern := chi.RouteContext(r.Context()).RoutePattern()
-		method := r.Method
-
-		isUserHavePermission, err := rc.RoleController.RoleInteractor.CheckRoutePermission(1, routePattern, method)
-		if err != nil || !isUserHavePermission {
-			http.Error(w, http.StatusText(403), 403)
-			return
+		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+		if err != nil || limit <= 0 {
+			limit = -1
 		}
 
-		next.ServeHTTP(w, r)
+		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+		if err != nil || offset < 0 || limit <= 0 {
+			offset = -1
+		}
+
+		pagination := &model.Pagination{
+			Limit:  limit,
+			Offset: offset,
+		}
+
+		ctx := context.WithValue(r.Context(), "pagination", pagination)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -104,4 +149,13 @@ type ErrResponse struct {
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.HTTPStatusCode)
 	return nil
+}
+
+func ErrInvalidRequest(err error, code int, text string) render.Renderer {
+	return &ErrResponse{
+		Err:            err,
+		HTTPStatusCode: code,
+		StatusText:     text,
+		ErrorText:      err.Error(),
+	}
 }

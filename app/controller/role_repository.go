@@ -40,16 +40,24 @@ func (rp *RoleRepository) Get(id uint) (*model.Role, error) {
 	return role, result.Error
 }
 
-func (rp *RoleRepository) CheckRoutePermission(id uint, routePattern string, method string) (bool, error) {
-	user := &model.User{}
-	result := rp.DB.Preload("Roles.ApiMethods", "path = ? AND method = ?", routePattern, method).
-		First(&user, id)
+func (rp *RoleRepository) CheckUserPermission(tokenString string, routePattern string, method string) (bool, *model.User, error) {
+	token := &model.Token{}
+	result := rp.DB.First(&token, "token = ?", tokenString)
 	if result.Error != nil {
-		return false, result.Error
+		return false, nil, result.Error
 	}
 
+	user := &model.User{}
+	result = rp.DB.
+		Preload("Roles.ApiMethods", "path = ? AND method = ?", routePattern, method).
+		First(&user, token.UserId)
+	if result.Error != nil {
+		return false, nil, result.Error
+	}
+	roles := &user.Roles
+
 	isUserHavePermission := false
-	for _, role := range user.Roles {
+	for _, role := range *roles {
 		if role.Code == "admin" {
 			isUserHavePermission = true
 			break
@@ -60,5 +68,5 @@ func (rp *RoleRepository) CheckRoutePermission(id uint, routePattern string, met
 		}
 	}
 
-	return isUserHavePermission, result.Error
+	return isUserHavePermission, user, nil
 }

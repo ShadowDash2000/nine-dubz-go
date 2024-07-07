@@ -9,16 +9,6 @@ import (
 	"os"
 )
 
-const publicDir = "public/"
-
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, publicDir+"dist/index.html")
-}
-
-func handleAdmin(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, publicDir+"admin.html")
-}
-
 func main() {
 	appIp, ok := os.LookupEnv("APP_IP")
 	if !ok {
@@ -30,16 +20,17 @@ func main() {
 	}
 	dbLogin, ok := os.LookupEnv("DB_LOGIN")
 	if !ok {
-		appPort = "root"
+		dbLogin = "root"
 	}
 	dbPassword, ok := os.LookupEnv("DB_PASSWORD")
 	if !ok {
-		appPort = ""
+		dbPassword = ""
 	}
 
 	dsn := dbLogin + ":" + dbPassword + "@tcp(localhost:3306)/nine-dubz?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		//Logger: logger.Default.LogMode(logger.Info),
+		PrepareStmt: true,
 	})
 	if err != nil {
 		panic("Failed to connect database")
@@ -50,6 +41,8 @@ func main() {
 		&model.User{},
 		&model.Role{},
 		&model.ApiMethod{},
+		&model.Token{},
+		&model.File{},
 	)
 
 	routerController := controller.NewRouterController(*db)
