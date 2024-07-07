@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"gorm.io/gorm"
 	"nine-dubz/app/model"
 )
@@ -41,38 +40,33 @@ func (rp *RoleRepository) Get(id uint) (*model.Role, error) {
 	return role, result.Error
 }
 
-func (rp *RoleRepository) CheckRoutePermission(userName string, routePattern string, method string) (bool, error) {
-	roles := &[]model.Role{}
-
-	if len(userName) == 0 {
-		result := rp.DB.Preload("ApiMethods", "path = ? AND method = ?", routePattern, method).
-			Find(&roles, "code = ?", "all")
-		if result.Error != nil {
-			return false, result.Error
-		}
-	} else {
-		user := &model.User{}
-		result := rp.DB.Preload("Roles.ApiMethods", "path = ? AND method = ?", routePattern, method).
-			First(&user, "name = ?", userName)
-		if result.Error != nil {
-			return false, result.Error
-		}
-		roles = &user.Roles
+func (rp *RoleRepository) CheckUserPermission(tokenString string, routePattern string, method string) (bool, *model.User, error) {
+	token := &model.Token{}
+	result := rp.DB.First(&token, "token = ?", tokenString)
+	if result.Error != nil {
+		return false, nil, result.Error
 	}
+
+	user := &model.User{}
+	result = rp.DB.
+		Preload("Roles.ApiMethods", "path = ? AND method = ?", routePattern, method).
+		First(&user, token.UserId)
+	if result.Error != nil {
+		return false, nil, result.Error
+	}
+	roles := &user.Roles
 
 	isUserHavePermission := false
 	for _, role := range *roles {
-		fmt.Println("Role Code: " + role.Code)
 		if role.Code == "admin" {
 			isUserHavePermission = true
 			break
 		}
 
-		for _, apiMethod := range role.ApiMethods {
-			fmt.Println("API Method: " + apiMethod.Path + ", Method: " + apiMethod.Method)
+		for range role.ApiMethods {
 			isUserHavePermission = true
 		}
 	}
 
-	return isUserHavePermission, nil
+	return isUserHavePermission, user, nil
 }

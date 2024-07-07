@@ -23,14 +23,16 @@ type RouterController struct {
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
+	tokenController := *NewTokenController("nine-dubz-token-secret", &db)
+
 	return &RouterController{
 		Router:                *chi.NewRouter(),
 		DB:                    &db,
 		MovieController:       *NewMovieController(&db),
-		RoleController:        *NewRoleController(&db),
+		RoleController:        *NewRoleController(&db, &tokenController),
 		ApiMethodController:   *NewApiMethodController(&db),
-		UserController:        *NewUserController(&db),
-		TokenController:       *NewTokenController("nine-dubz-token-secret"),
+		UserController:        *NewUserController(&db, &tokenController),
+		TokenController:       tokenController,
 		GoogleOauthController: *NewGoogleOauthController(),
 	}
 }
@@ -59,38 +61,48 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 				next.ServeHTTP(w, r)
 			})
 		})
+
 		r.Route("/movie", func(r chi.Router) {
-			r.With(rc.Permission).Post("/", rc.MovieController.Add)
-			r.With(rc.Permission).With(rc.Pagination).Get("/", rc.MovieController.GetAll)
+			r.With(rc.RoleController.Permission).Post("/", rc.MovieController.Add)
+			r.With(rc.RoleController.Permission).With(rc.Pagination).Get("/", rc.MovieController.GetAll)
 
 			r.Route("/{movieId}", func(r chi.Router) {
-				r.With(rc.Permission).Get("/", rc.MovieController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.MovieController.Get)
 			})
 		})
 		r.Route("/role", func(r chi.Router) {
-			r.With(rc.Permission).Post("/", rc.RoleController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.RoleController.Add)
 
 			r.Route("/{roleId}", func(r chi.Router) {
-				r.With(rc.Permission).Get("/", rc.RoleController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.RoleController.Get)
 			})
 		})
 		r.Route("/api-method", func(r chi.Router) {
-			r.With(rc.Permission).Post("/", rc.ApiMethodController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.ApiMethodController.Add)
 
 			r.Route("/{apiMethodId}", func(r chi.Router) {
-				r.With(rc.Permission).Get("/", rc.ApiMethodController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.ApiMethodController.Get)
 			})
 		})
+
 		r.Route("/user", func(r chi.Router) {
-			r.With(rc.Permission).Post("/", rc.UserController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.UserController.Add)
+			r.With(rc.RoleController.Permission).Get("/short", rc.UserController.GetUserShort)
 
 			r.Route("/{userId}", func(r chi.Router) {
-				r.With(rc.Permission).Get("/", rc.UserController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.UserController.Get)
 			})
+
+			r.Get("/check-by-name", rc.UserController.CheckUserWithNameExists)
 		})
+
 		r.Route("/authorize", func(r chi.Router) {
 			r.Route("/google", func(r chi.Router) {
 				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrl)
+			})
+			r.Route("/inner", func(r chi.Router) {
+				r.Post("/register", rc.UserController.Register)
+				r.Post("/login", rc.UserController.Login)
 			})
 		})
 	})
@@ -101,31 +113,6 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	}))*/
 
 	return &rc.Router
-}
-
-func (rc *RouterController) Permission(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userName := ""
-		tokenCookie, err := r.Cookie("token")
-		if err == nil {
-			token, err := rc.TokenController.Verify(tokenCookie.String())
-			if err != nil {
-				http.Error(w, http.StatusText(403), 403)
-			}
-			userName, _ = token.Claims.GetSubject()
-		}
-
-		routePattern := chi.RouteContext(r.Context()).RoutePattern()
-		method := r.Method
-
-		isUserHavePermission, err := rc.RoleController.RoleInteractor.CheckRoutePermission(userName, routePattern, method)
-		if err != nil || !isUserHavePermission {
-			http.Error(w, http.StatusText(403), 403)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }
 
 func (rc *RouterController) Pagination(next http.Handler) http.Handler {
@@ -162,4 +149,13 @@ type ErrResponse struct {
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.HTTPStatusCode)
 	return nil
+}
+
+func ErrInvalidRequest(err error, code int, text string) render.Renderer {
+	return &ErrResponse{
+		Err:            err,
+		HTTPStatusCode: code,
+		StatusText:     text,
+		ErrorText:      err.Error(),
+	}
 }

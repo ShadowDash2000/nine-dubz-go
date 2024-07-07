@@ -7,5 +7,5 @@ type RoleRepository interface {
 	Remove(id uint) error
 	Update(role *model.Role) error
 	Get(id uint) (*model.Role, error)
-	CheckRoutePermission(userName string, routePattern string, method string) (bool, error)
+	CheckUserPermission(token string, routePattern string, method string) (bool, *model.User, error)
 }

@@ -30,6 +30,7 @@ func main() {
 	dsn := dbLogin + ":" + dbPassword + "@tcp(localhost:3306)/nine-dubz?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		//Logger: logger.Default.LogMode(logger.Info),
+		PrepareStmt: true,
 	})
 	if err != nil {
 		panic("Failed to connect database")
@@ -40,6 +41,8 @@ func main() {
 		&model.User{},
 		&model.Role{},
 		&model.ApiMethod{},
+		&model.Token{},
+		&model.File{},
 	)
 
 	routerController := controller.NewRouterController(*db)
