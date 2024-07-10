@@ -27,7 +27,7 @@ func (mr *MovieRepository) Remove(id uint) error {
 	return result.Error
 }
 
-func (mr *MovieRepository) Update(movie *model.Movie) error {
+func (mr *MovieRepository) Save(movie *model.Movie) error {
 	result := mr.DB.Save(&movie)
 
 	return result.Error

@@ -1,24 +1,25 @@
 package payload
 
 import (
+	"gorm.io/gorm"
 	"net/http"
 	"nine-dubz/app/model"
 )
 
 type UserShortPayload struct {
-	Password omit       `json:"password,omitempty"`
-	Picture  model.File `json:"picture,omitempty"`
-	*UserPayload
+	*gorm.Model
+	*model.User
+	Password  omit `json:"-"`
+	PictureId omit `json:"-"`
+	Roles     omit `json:"-"`
 }
 
 func NewUserShortPayload(user *model.User) *UserShortPayload {
 	return &UserShortPayload{
-		UserPayload: &UserPayload{
-			User: &model.User{
-				Name:    user.Name,
-				Email:   user.Email,
-				Picture: user.Picture,
-			},
+		User: &model.User{
+			Name:    user.Name,
+			Email:   user.Email,
+			Picture: user.Picture,
 		},
 	}
 }

@@ -14,8 +14,8 @@ func (mi *MovieInteractor) Remove(id uint) error {
 	return mi.MovieRepository.Remove(id)
 }
 
-func (mi *MovieInteractor) Update(movie *model.Movie) error {
-	return mi.MovieRepository.Update(movie)
+func (mi *MovieInteractor) Save(movie *model.Movie) error {
+	return mi.MovieRepository.Save(movie)
 }
 
 func (mi *MovieInteractor) Get(id uint) (*model.Movie, error) {

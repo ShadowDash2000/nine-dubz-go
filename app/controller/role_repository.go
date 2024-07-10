@@ -9,12 +9,6 @@ type RoleRepository struct {
 	DB *gorm.DB
 }
 
-func NewRoleRepository(db *gorm.DB) *RoleRepository {
-	return &RoleRepository{
-		DB: db,
-	}
-}
-
 func (rp *RoleRepository) Add(role *model.Role) (uint, error) {
 	result := rp.DB.Create(role)
 
@@ -27,7 +21,7 @@ func (rp *RoleRepository) Remove(id uint) error {
 	return result.Error
 }
 
-func (rp *RoleRepository) Update(role *model.Role) error {
+func (rp *RoleRepository) Save(role *model.Role) error {
 	result := rp.DB.Save(role)
 
 	return result.Error
@@ -40,11 +34,11 @@ func (rp *RoleRepository) Get(id uint) (*model.Role, error) {
 	return role, result.Error
 }
 
-func (rp *RoleRepository) CheckUserPermission(tokenString string, routePattern string, method string) (bool, *model.User, error) {
+func (rp *RoleRepository) CheckUserPermission(tokenString string, routePattern string, method string) (bool, *model.User) {
 	token := &model.Token{}
 	result := rp.DB.First(&token, "token = ?", tokenString)
 	if result.Error != nil {
-		return false, nil, result.Error
+		return false, nil
 	}
 
 	user := &model.User{}
@@ -52,7 +46,7 @@ func (rp *RoleRepository) CheckUserPermission(tokenString string, routePattern s
 		Preload("Roles.ApiMethods", "path = ? AND method = ?", routePattern, method).
 		First(&user, token.UserId)
 	if result.Error != nil {
-		return false, nil, result.Error
+		return false, nil
 	}
 	roles := &user.Roles
 
@@ -68,5 +62,5 @@ func (rp *RoleRepository) CheckUserPermission(tokenString string, routePattern s
 		}
 	}
 
-	return isUserHavePermission, user, nil
+	return isUserHavePermission, user
 }

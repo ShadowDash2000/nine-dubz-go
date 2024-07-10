@@ -1,22 +1,26 @@
 package payload
 
 import (
+	"gorm.io/gorm"
 	"net/http"
 	"nine-dubz/app/model"
 )
 
 type RegistrationPayload struct {
-	*UserPayload
+	*gorm.Model
+	*model.User
+	PictureId omit `json:"-"`
+	Picture   omit `json:"-"`
+	Roles     omit `json:"-"`
 }
 
 func NewRegistrationPayload(user *model.User) *RegistrationPayload {
 	return &RegistrationPayload{
-		UserPayload: &UserPayload{
-			User: &model.User{
-				Name:     user.Name,
-				Email:    user.Email,
-				Password: user.Password,
-			}},
+		User: &model.User{
+			Name:     user.Name,
+			Email:    user.Email,
+			Password: user.Password,
+		},
 	}
 }
 

@@ -16,8 +16,8 @@ func (ui *UserInteractor) Remove(id uint) error {
 	return ui.UserRepository.Remove(id)
 }
 
-func (ui *UserInteractor) Update(user *model.User) error {
-	return ui.UserRepository.Update(user)
+func (ui *UserInteractor) Save(user *model.User) error {
+	return ui.UserRepository.Save(user)
 }
 
 func (ui *UserInteractor) Get(id uint) (*model.User, error) {
@@ -30,4 +30,8 @@ func (ui *UserInteractor) GetByName(name string) (*model.User, error) {
 
 func (ui *UserInteractor) Login(user *model.User) bool {
 	return ui.UserRepository.Login(user)
+}
+
+func (ui *UserInteractor) LoginWOPassword(user *model.User) bool {
+	return ui.UserRepository.LoginWOPassword(user)
 }

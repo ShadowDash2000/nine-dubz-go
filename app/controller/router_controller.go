@@ -14,26 +14,37 @@ import (
 type RouterController struct {
 	Router                chi.Mux
 	DB                    *gorm.DB
+	LanguageController    LanguageController
 	MovieController       MovieController
 	RoleController        RoleController
 	ApiMethodController   ApiMethodController
 	UserController        UserController
 	TokenController       TokenController
 	GoogleOauthController GoogleOauthController
+	FileController        FileController
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
-	tokenController := *NewTokenController("nine-dubz-token-secret", &db)
+	tc := *NewTokenController("nine-dubz-token-secret", &db)
+	lc := *NewLanguageController("lang")
+	mc := *NewMovieController(&db)
+	rc := *NewRoleController(&db, &tc)
+	amc := *NewApiMethodController(&db)
+	uc := *NewUserController(&db, &tc, &lc)
+	goc := *NewGoogleOauthController(&db, &lc, &uc)
+	fc := *NewFileController(&db, &lc)
 
 	return &RouterController{
 		Router:                *chi.NewRouter(),
 		DB:                    &db,
-		MovieController:       *NewMovieController(&db),
-		RoleController:        *NewRoleController(&db, &tokenController),
-		ApiMethodController:   *NewApiMethodController(&db),
-		UserController:        *NewUserController(&db, &tokenController),
-		TokenController:       tokenController,
-		GoogleOauthController: *NewGoogleOauthController(),
+		LanguageController:    lc,
+		MovieController:       mc,
+		RoleController:        rc,
+		ApiMethodController:   amc,
+		UserController:        uc,
+		TokenController:       tc,
+		GoogleOauthController: goc,
+		FileController:        fc,
 	}
 }
 
@@ -42,9 +53,13 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 	rc.Router.Use(middleware.Recoverer)
 	rc.Router.Use(middleware.URLFormat)
 	rc.Router.Use(render.SetContentType(render.ContentTypeJSON))
+	rc.Router.Use(rc.LanguageController.Language)
 
 	rc.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "public/index.html")
+	})
+	rc.Router.Get("/socket-test", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "public/socket_test.html")
 	})
 
 	rc.Router.Get("/authorize", rc.GoogleOauthController.Authorize)
@@ -55,7 +70,8 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 				/**
 				TODO remove in future
 				*/
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 
 				next.ServeHTTP(w, r)
@@ -63,54 +79,81 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 		})
 
 		r.Route("/movie", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.MovieController.Add)
-			r.With(rc.RoleController.Permission).With(rc.Pagination).Get("/", rc.MovieController.GetAll)
+			r.With(rc.RoleController.Permission).Post("/", rc.MovieController.AddHandler)
+			r.With(rc.Pagination).Get("/", rc.MovieController.GetAllHandler)
 
 			r.Route("/{movieId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.MovieController.Get)
+				r.Get("/", rc.MovieController.Get)
 			})
 		})
 		r.Route("/role", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.RoleController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.RoleController.AddHandler)
 
 			r.Route("/{roleId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.RoleController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.RoleController.GetHandler)
 			})
 		})
 		r.Route("/api-method", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.ApiMethodController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.ApiMethodController.AddHandler)
 
 			r.Route("/{apiMethodId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.ApiMethodController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.ApiMethodController.GetHandler)
 			})
 		})
 
 		r.Route("/user", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.UserController.Add)
-			r.With(rc.RoleController.Permission).Get("/short", rc.UserController.GetUserShort)
+			r.With(rc.RoleController.Permission).Post("/", rc.UserController.AddHandler)
 
-			r.Route("/{userId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.UserController.Get)
+			r.Route("/get-short", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Get("/", rc.UserController.GetUserShortHandler)
 			})
 
-			r.Get("/check-by-name", rc.UserController.CheckUserWithNameExists)
+			r.Route("/get/{userId}", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Get("/", rc.UserController.GetHandler)
+			})
+
+			r.Get("/check-by-name", rc.UserController.CheckUserWithNameExistsHandler)
 		})
 
+		/**
+		TODO Add restriction if user is already authorized
+		*/
 		r.Route("/authorize", func(r chi.Router) {
 			r.Route("/google", func(r chi.Router) {
-				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrl)
+				r.Get("/", rc.GoogleOauthController.Authorize)
+				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrlHandler)
 			})
 			r.Route("/inner", func(r chi.Router) {
-				r.Post("/register", rc.UserController.Register)
-				r.Post("/login", rc.UserController.Login)
+				r.Post("/register", rc.UserController.RegisterHandler)
+				r.Post("/login", rc.UserController.LoginHandler)
 			})
 		})
 	})
 
-	/*fmt.Println(docgen.MarkdownRoutesDoc(&rc.Router, docgen.MarkdownOpts{
+	rc.Router.Route("/file", func(r chi.Router) {
+		r.Get("/", rc.FileController.UploadVideoHandler)
+	})
+
+	// Generate api doc file
+	/*file, err := os.Create("routes.md")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+
+	apiDoc := docgen.MarkdownRoutesDoc(&rc.Router, docgen.MarkdownOpts{
 		ProjectPath: "github.com/go-chi/chi/v5",
 		Intro:       "Welcome to the chi/_examples/rest generated docs.",
-	}))*/
+		URLMap: map[string]string{
+			"github.com/newline-sandbox/go-chi-docgen-example/vendor/github.com/go-chi/chi/v5/": "https://github.com/go-chi/chi/blob/master/",
+		},
+		ForceRelativeLinks: true,
+	})
+
+	if _, err = file.Write([]byte(apiDoc)); err != nil {
+		log.Fatal(err)
+	}*/
 
 	return &rc.Router
 }

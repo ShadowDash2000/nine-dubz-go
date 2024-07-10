@@ -1,4 +1,4 @@
-package model
+package payload
 
 type GoogleUserInfo struct {
 	Id            string `json:"id"`

@@ -25,7 +25,7 @@ func NewMovieController(db *gorm.DB) *MovieController {
 	}
 }
 
-func (mc *MovieController) Add(w http.ResponseWriter, r *http.Request) {
+func (mc *MovieController) AddHandler(w http.ResponseWriter, r *http.Request) {
 	movie := &model.Movie{}
 	err := json.NewDecoder(r.Body).Decode(&movie)
 	if err != nil {
@@ -68,7 +68,7 @@ func (mc *MovieController) Get(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, movie)
 }
 
-func (mc *MovieController) GetAll(w http.ResponseWriter, r *http.Request) {
+func (mc *MovieController) GetAllHandler(w http.ResponseWriter, r *http.Request) {
 	pagination := r.Context().Value("pagination").(*model.Pagination)
 
 	movies, err := mc.MovieInteractor.GetAll(pagination)
