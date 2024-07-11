@@ -53,7 +53,7 @@ Status Messages: <output id="list"></output>
             document.getElementById('uploadButton').style.display = 'none';
             document.getElementById('cancelButton').style.display = 'block';
             // Open and configure websocket connection.
-            ws = new WebSocket("ws://localhost:25565/file");
+            ws = new WebSocket("ws://localhost:25565/api/movie/upload");
             ws.binaryType = 'arraybuffer';
             // Send filename and size to the server when the connection is opened.
             ws.onopen = function(evt) {

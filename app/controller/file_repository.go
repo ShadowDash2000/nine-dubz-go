@@ -6,10 +6,12 @@ import (
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"nine-dubz/app/model"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -17,10 +19,10 @@ type FileRepository struct {
 	DB *gorm.DB
 }
 
-func (fr *FileRepository) Add(file *model.File) (uint, error) {
+func (fr *FileRepository) Add(file *model.File) (*model.File, error) {
 	result := fr.DB.Create(&file)
 
-	return file.ID, result.Error
+	return file, result.Error
 }
 
 func (fr *FileRepository) Remove(id uint) error {
@@ -48,7 +50,7 @@ func (fr *FileRepository) Get(id uint) (*model.File, error) {
 	return file, result.Error
 }
 
-func VerifyFileType(buff []byte, types []string) (bool, string) {
+func (fr *FileRepository) VerifyFileType(buff []byte, types []string) (bool, string) {
 	filetype := http.DetectContentType(buff)
 	isCorrectType := false
 	for _, t := range types {
@@ -61,50 +63,63 @@ func VerifyFileType(buff []byte, types []string) (bool, string) {
 	return isCorrectType, filetype
 }
 
-func (fr *FileRepository) CopyTmpFile(uploadPath string, tmpFilePath string, header *model.UploadHeader) error {
+func (fr *FileRepository) CopyTmpFile(uploadPath string, tmpFilePath string, header *model.UploadHeader) (*model.File, error) {
 	tmpFile, err := os.Open(tmpFilePath)
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return nil, err
 	}
+	defer tmpFile.Close()
 
 	err = os.MkdirAll(uploadPath, os.ModePerm)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	newFileName := time.Now().UnixNano()
-	filePath := fmt.Sprintf(uploadPath+"/%d%s", newFileName, filepath.Ext(header.Filename))
+	timeNow := time.Now().UnixNano()
+	newFileName := strconv.Itoa(int(timeNow))
+	extension := filepath.Ext(header.Filename)
+	filePath := uploadPath + "/" + newFileName + extension
 	f, err := os.Create(filePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 
-	_, err = fr.Add(&model.File{
+	size, err := io.Copy(f, tmpFile)
+	if err != nil {
+		return nil, err
+	}
+
+	tmpFile.Close()
+	os.Remove(tmpFilePath)
+
+	savedFile, err := fr.Add(&model.File{
 		Name:         newFileName,
+		Extension:    extension,
 		OriginalName: header.Filename,
 		Path:         filePath,
+		Size:         size,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = io.Copy(f, tmpFile)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return savedFile, nil
 }
 
 const (
-	UploadStatusNext     int = 0
-	UploadStatusError    int = 1
-	UploadStatusComplete int = 2
+	UploadStatusNextChunk int = 0
+	UploadStatusError     int = 1
+	UploadStatusComplete  int = 2
 )
 
 func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string, header *model.UploadHeader, conn *websocket.Conn) (string, error) {
+	err := os.MkdirAll(tmpPath, os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
 	tmpFile, err := os.CreateTemp(tmpPath, "websocket_upload_")
 	if err != nil {
 		fmt.Println("Could not create temp file: " + err.Error())
@@ -116,7 +131,7 @@ func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string
 	isCorrectType := false
 
 	conn.WriteJSON(&model.UploadStatus{
-		Status: UploadStatusNext,
+		Status: UploadStatusNextChunk,
 	})
 
 	for {
@@ -130,7 +145,7 @@ func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string
 		}
 
 		if !isCorrectType {
-			isCorrectType, _ = VerifyFileType(message, fileTypes)
+			isCorrectType, _ = fr.VerifyFileType(message, fileTypes)
 			if !isCorrectType {
 				conn.WriteJSON(&model.UploadStatus{
 					Status: UploadStatusError,
@@ -140,7 +155,7 @@ func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string
 			}
 		}
 
-		if bytesRead > 2<<30 {
+		if bytesRead > 8<<30 {
 			conn.WriteJSON(&model.UploadStatus{
 				Status: UploadStatusError,
 				Error:  err.Error(),
@@ -149,15 +164,18 @@ func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string
 			return "", errors.New("file is too large")
 		}
 
-		if messageType == websocket.CloseMessage {
-			conn.WriteJSON(&model.UploadStatus{
-				Status: UploadStatusComplete,
-				Error:  "upload canceled",
-			})
-			return "", errors.New("upload canceled")
-		}
-
 		if messageType != websocket.BinaryMessage {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+
+			if messageType == websocket.CloseMessage {
+				conn.WriteJSON(&model.UploadStatus{
+					Status: UploadStatusComplete,
+					Error:  "upload canceled",
+				})
+				return "", errors.New("upload canceled")
+			}
+
 			conn.WriteJSON(&model.UploadStatus{
 				Status: UploadStatusError,
 				Error:  "invalid file block received",
@@ -174,7 +192,7 @@ func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string
 		}
 
 		conn.WriteJSON(&model.UploadStatus{
-			Status: UploadStatusNext,
+			Status: UploadStatusNextChunk,
 		})
 	}
 
@@ -183,4 +201,39 @@ func (fr *FileRepository) WriteFileFromSocket(tmpPath string, fileTypes []string
 	})
 
 	return tmpFile.Name(), nil
+}
+
+func (fr *FileRepository) SaveFile(path string, fileName string, file multipart.File) (*model.File, error) {
+	err := os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	timeNow := time.Now().UnixNano()
+	newFileName := strconv.Itoa(int(timeNow))
+	extension := filepath.Ext(fileName)
+	filePath := path + newFileName + extension
+	f, err := os.Create(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	size, err := io.Copy(f, file)
+	if err != nil {
+		return nil, err
+	}
+
+	savedFile, err := fr.Add(&model.File{
+		Name:         newFileName,
+		Extension:    extension,
+		OriginalName: fileName,
+		Path:         filePath,
+		Size:         size,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return savedFile, nil
 }

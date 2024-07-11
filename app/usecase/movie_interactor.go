@@ -6,7 +6,7 @@ type MovieInteractor struct {
 	MovieRepository MovieRepository
 }
 
-func (mi *MovieInteractor) Add(movie *model.Movie) (uint, error) {
+func (mi *MovieInteractor) Add(movie *model.Movie) (*model.Movie, error) {
 	return mi.MovieRepository.Add(movie)
 }
 

@@ -28,6 +28,10 @@
     {
       "code": "REQUEST_MAX_SIZE_LIMIT",
       "text": "File is too large"
+    },
+    {
+      "code": "REQUEST_NO_PICTURE_FILE",
+      "text": "No picture file"
     }
   ]
 }

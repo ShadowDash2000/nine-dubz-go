@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
 	"nine-dubz/app/model"
 	"nine-dubz/app/model/language"
@@ -19,9 +20,10 @@ type UserController struct {
 	TokenController    *TokenController
 	HelperInteractor   *usecase.HelperInteractor
 	LanguageController *LanguageController
+	FileController     *FileController
 }
 
-func NewUserController(db *gorm.DB, tc *TokenController, lc *LanguageController) *UserController {
+func NewUserController(db *gorm.DB, tc *TokenController, lc *LanguageController, fc *FileController) *UserController {
 	return &UserController{
 		UserInteractor: usecase.UserInteractor{
 			UserRepository: &UserRepository{
@@ -33,6 +35,7 @@ func NewUserController(db *gorm.DB, tc *TokenController, lc *LanguageController)
 			HelperRepository: &HelperRepository{},
 		},
 		LanguageController: lc,
+		FileController:     fc,
 	}
 }
 
@@ -205,4 +208,54 @@ func (uc *UserController) GetUserShortHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	render.JSON(w, r, *payload.NewUserShortPayload(user))
+}
+
+func (uc *UserController) UpdateUserPictureHandler(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		text, _ := uc.LanguageController.GetStringByCode(r, "REQUEST_MAX_SIZE_LIMIT")
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, text))
+		return
+	}
+
+	file, fileHeader, err := r.FormFile("picture")
+	if err != nil {
+		text, _ := uc.LanguageController.GetStringByCode(r, "REQUEST_NO_PICTURE_FILE")
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, text))
+		return
+	}
+	defer file.Close()
+
+	buff := make([]byte, 512)
+	_, err = file.Read(buff)
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusInternalServerError, "Failed to verify file type"))
+		return
+	}
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusInternalServerError, ""))
+		return
+	}
+	isCorrectType, _ := uc.FileController.VerifyFileType(buff, []string{"image/jpeg", "image/png", "image/gif", "image/webp"})
+	if !isCorrectType {
+		text, _ := uc.LanguageController.GetStringByCode(r, "REQUEST_WRONG_FILE_TYPE")
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, text))
+		return
+	}
+
+	picture, err := uc.FileController.SaveFile("upload/profile_pictures", fileHeader.Filename, file)
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, "Failed to save file"))
+		return
+	}
+
+	userId := r.Context().Value("userId").(uint)
+	err = uc.UserInteractor.Updates(&model.User{
+		ID:      userId,
+		Picture: picture,
+	})
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusInternalServerError, "Failed to update user picture"))
+		return
+	}
 }

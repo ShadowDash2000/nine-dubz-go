@@ -42,6 +42,12 @@ func (ur *UserRepository) Save(user *model.User) error {
 	return result.Error
 }
 
+func (ur *UserRepository) Updates(user *model.User) error {
+	result := ur.DB.Updates(&user)
+
+	return result.Error
+}
+
 func (ur *UserRepository) Get(id uint) (*model.User, error) {
 	user := &model.User{}
 	result := ur.DB.Preload("Picture").First(&user, id)

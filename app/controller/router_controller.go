@@ -22,17 +22,19 @@ type RouterController struct {
 	TokenController       TokenController
 	GoogleOauthController GoogleOauthController
 	FileController        FileController
+	S3Controller          S3Controller
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
 	tc := *NewTokenController("nine-dubz-token-secret", &db)
 	lc := *NewLanguageController("lang")
-	mc := *NewMovieController(&db)
+	sc := *NewS3Controller()
+	fc := *NewFileController(&db, &lc, &sc)
+	mc := *NewMovieController(&db, &fc)
 	rc := *NewRoleController(&db, &tc)
 	amc := *NewApiMethodController(&db)
-	uc := *NewUserController(&db, &tc, &lc)
+	uc := *NewUserController(&db, &tc, &lc, &fc)
 	goc := *NewGoogleOauthController(&db, &lc, &uc)
-	fc := *NewFileController(&db, &lc)
 
 	return &RouterController{
 		Router:                *chi.NewRouter(),
@@ -45,6 +47,7 @@ func NewRouterController(db gorm.DB) *RouterController {
 		TokenController:       tc,
 		GoogleOauthController: goc,
 		FileController:        fc,
+		S3Controller:          sc,
 	}
 }
 
@@ -78,12 +81,21 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 			})
 		})
 
+		r.Route("/file", func(r chi.Router) {
+			r.Route("/stream/{fileName}", func(r chi.Router) {
+				r.Get("/", rc.FileController.StreamFile)
+			})
+		})
+
 		r.Route("/movie", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.MovieController.AddHandler)
 			r.With(rc.Pagination).Get("/", rc.MovieController.GetAllHandler)
 
+			r.Route("/upload", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Get("/", rc.MovieController.AddHandler)
+			})
+
 			r.Route("/{movieId}", func(r chi.Router) {
-				r.Get("/", rc.MovieController.Get)
+				r.Get("/", rc.MovieController.GetHandler)
 			})
 		})
 		r.Route("/role", func(r chi.Router) {
@@ -112,7 +124,13 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 				r.With(rc.RoleController.Permission).Get("/", rc.UserController.GetHandler)
 			})
 
-			r.Get("/check-by-name", rc.UserController.CheckUserWithNameExistsHandler)
+			r.Route("/check-by-name", func(r chi.Router) {
+				r.Get("/", rc.UserController.CheckUserWithNameExistsHandler)
+			})
+
+			r.Route("/update-picture", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Post("/", rc.UserController.UpdateUserPictureHandler)
+			})
 		})
 
 		/**
@@ -128,10 +146,6 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 				r.Post("/login", rc.UserController.LoginHandler)
 			})
 		})
-	})
-
-	rc.Router.Route("/file", func(r chi.Router) {
-		r.Get("/", rc.FileController.UploadVideoHandler)
 	})
 
 	// Generate api doc file

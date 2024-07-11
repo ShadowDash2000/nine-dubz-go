@@ -28,6 +28,10 @@
     {
       "code": "REQUEST_MAX_SIZE_LIMIT",
       "text": "Файл слишком болошой"
+    },
+    {
+      "code": "REQUEST_NO_PICTURE_FILE",
+      "text": "Нет файла с картинкой"
     }
   ]
 }

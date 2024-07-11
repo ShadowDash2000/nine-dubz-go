@@ -20,6 +20,10 @@ func (ui *UserInteractor) Save(user *model.User) error {
 	return ui.UserRepository.Save(user)
 }
 
+func (ui *UserInteractor) Updates(user *model.User) error {
+	return ui.UserRepository.Updates(user)
+}
+
 func (ui *UserInteractor) Get(id uint) (*model.User, error) {
 	return ui.UserRepository.Get(id)
 }

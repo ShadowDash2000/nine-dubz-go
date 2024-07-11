@@ -1,5 +1,4 @@
 .idea
-go.sum
-app/app.exe
+app.exe
 routes.md
 upload
