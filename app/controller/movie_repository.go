@@ -15,10 +15,10 @@ func NewMovieRepository(db *gorm.DB) *MovieRepository {
 	}
 }
 
-func (mr *MovieRepository) Add(movie *model.Movie) (*model.Movie, error) {
+func (mr *MovieRepository) Add(movie *model.Movie) error {
 	result := mr.DB.Create(&movie)
 
-	return movie, result.Error
+	return result.Error
 }
 
 func (mr *MovieRepository) Remove(id uint) error {
@@ -29,6 +29,12 @@ func (mr *MovieRepository) Remove(id uint) error {
 
 func (mr *MovieRepository) Save(movie *model.Movie) error {
 	result := mr.DB.Save(&movie)
+
+	return result.Error
+}
+
+func (mr *MovieRepository) Updates(movie *model.Movie) error {
+	result := mr.DB.Updates(&movie)
 
 	return result.Error
 }

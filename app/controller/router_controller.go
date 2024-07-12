@@ -29,7 +29,8 @@ func NewRouterController(db gorm.DB) *RouterController {
 	tc := *NewTokenController("nine-dubz-token-secret", &db)
 	lc := *NewLanguageController("lang")
 	sc := *NewS3Controller()
-	fc := *NewFileController(&db, &lc, &sc)
+	vc := *NewVideoController()
+	fc := *NewFileController(&db, &lc, &vc, &sc)
 	mc := *NewMovieController(&db, &fc)
 	rc := *NewRoleController(&db, &tc)
 	amc := *NewApiMethodController(&db)
@@ -52,7 +53,7 @@ func NewRouterController(db gorm.DB) *RouterController {
 }
 
 func (rc *RouterController) HandleRoute() *chi.Mux {
-	rc.Router.Use(middleware.Logger)
+	//rc.Router.Use(middleware.Logger)
 	rc.Router.Use(middleware.Recoverer)
 	rc.Router.Use(middleware.URLFormat)
 	rc.Router.Use(render.SetContentType(render.ContentTypeJSON))
@@ -114,8 +115,6 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 		})
 
 		r.Route("/user", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.UserController.AddHandler)
-
 			r.Route("/get-short", func(r chi.Router) {
 				r.With(rc.RoleController.Permission).Get("/", rc.UserController.GetUserShortHandler)
 			})
@@ -142,32 +141,18 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrlHandler)
 			})
 			r.Route("/inner", func(r chi.Router) {
-				r.Post("/register", rc.UserController.RegisterHandler)
-				r.Post("/login", rc.UserController.LoginHandler)
+				r.Route("/register", func(r chi.Router) {
+					r.Post("/", rc.UserController.RegisterHandler)
+				})
+				r.Route("/login", func(r chi.Router) {
+					r.Post("/", rc.UserController.LoginHandler)
+				})
+				r.Route("/confirm", func(r chi.Router) {
+					r.Get("/", rc.UserController.ConfirmRegistrationHandler)
+				})
 			})
 		})
 	})
-
-	// Generate api doc file
-	/*file, err := os.Create("routes.md")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer file.Close()
-
-	apiDoc := docgen.MarkdownRoutesDoc(&rc.Router, docgen.MarkdownOpts{
-		ProjectPath: "github.com/go-chi/chi/v5",
-		Intro:       "Welcome to the chi/_examples/rest generated docs.",
-		URLMap: map[string]string{
-			"github.com/newline-sandbox/go-chi-docgen-example/vendor/github.com/go-chi/chi/v5/": "https://github.com/go-chi/chi/blob/master/",
-		},
-		ForceRelativeLinks: true,
-	})
-
-	if _, err = file.Write([]byte(apiDoc)); err != nil {
-		log.Fatal(err)
-	}*/
 
 	return &rc.Router
 }
@@ -198,9 +183,9 @@ type ErrResponse struct {
 	Err            error `json:"-"` // low-level runtime error
 	HTTPStatusCode int   `json:"-"` // http response status code
 
-	StatusText string `json:"status"`          // user-level status message
-	AppCode    int64  `json:"code,omitempty"`  // application-specific error code
-	ErrorText  string `json:"error,omitempty"` // application-level error message, for debugging
+	StatusText string `json:"status"`         // user-level status message
+	AppCode    int64  `json:"code,omitempty"` // application-specific error code
+	ErrorText  string `json:"-"`              // application-level error message, for debugging
 }
 
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {

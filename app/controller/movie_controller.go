@@ -29,22 +29,23 @@ func NewMovieController(db *gorm.DB, fc *FileController) *MovieController {
 }
 
 func (mc *MovieController) AddHandler(w http.ResponseWriter, r *http.Request) {
-	file, err := mc.FileController.SocketVideoUpload(w, r)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	movie := &model.Movie{
-		Name:  file.OriginalName,
-		Video: file,
-	}
-
-	movie, err = mc.MovieInteractor.Add(payload.NewMoviePayload(movie))
+	movie := &model.Movie{}
+	err := mc.MovieInteractor.Add(movie)
 	if err != nil {
 		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, "Cannot add movie"))
 		return
 	}
+
+	file, err := mc.FileController.SocketVideoUpload(w, r)
+	if err != nil {
+		mc.MovieInteractor.Remove(movie.ID)
+
+		fmt.Println(err)
+		return
+	}
+
+	movie.Video = file
+	mc.MovieInteractor.Updates(movie)
 }
 
 func (mc *MovieController) GetHandler(w http.ResponseWriter, r *http.Request) {

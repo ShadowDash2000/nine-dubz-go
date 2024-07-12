@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"gorm.io/gorm"
@@ -21,6 +22,7 @@ type UserController struct {
 	HelperInteractor   *usecase.HelperInteractor
 	LanguageController *LanguageController
 	FileController     *FileController
+	MailController     *MailController
 }
 
 func NewUserController(db *gorm.DB, tc *TokenController, lc *LanguageController, fc *FileController) *UserController {
@@ -36,23 +38,8 @@ func NewUserController(db *gorm.DB, tc *TokenController, lc *LanguageController,
 		},
 		LanguageController: lc,
 		FileController:     fc,
+		MailController:     NewMailController(),
 	}
-}
-
-func (uc *UserController) AddHandler(w http.ResponseWriter, r *http.Request) {
-	user := &model.User{}
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	}
-
-	id, err := uc.UserInteractor.Add(user)
-	if err != nil {
-		render.Render(w, r, ErrInvalidRequest(err, http.StatusNotFound, "Cannot add user"))
-		return
-	}
-
-	render.JSON(w, r, id)
 }
 
 func (uc *UserController) GetHandler(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +48,7 @@ func (uc *UserController) GetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid user id", http.StatusBadRequest)
 	}
 
-	user, err := uc.UserInteractor.Get(uint(userId))
+	user, err := uc.UserInteractor.GetById(uint(userId))
 	if err != nil {
 		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, "User not found"))
 		return
@@ -92,18 +79,18 @@ func (uc *UserController) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}{true})
 }
 
-func (uc *UserController) Login(loginPayload *payload.LoginPayload, usePassword bool) (*http.Cookie, *language.StringCode, error) {
+func (uc *UserController) Login(user *model.User, usePassword bool) (*http.Cookie, *language.StringCode, error) {
 	if usePassword {
-		if ok := uc.UserInteractor.Login(loginPayload.User); !ok {
+		if ok := uc.UserInteractor.Login(user); !ok {
 			return nil, language.NewStringCode("LOGIN_USER_NOT_FOUND"), errors.New("user not found")
 		}
 	} else {
-		if ok := uc.UserInteractor.LoginWOPassword(loginPayload.User); !ok {
+		if ok := uc.UserInteractor.LoginWOPassword(user); !ok {
 			return nil, language.NewStringCode("LOGIN_USER_NOT_FOUND"), errors.New("user not found")
 		}
 	}
 
-	tokenCookie, err := uc.GetTokenCookie(loginPayload.User)
+	tokenCookie, err := uc.GetTokenCookie(user)
 	if err != nil {
 		return nil, language.NewStringCode("TOKEN_FAILED_TO_CREATE"), err
 	}
@@ -138,35 +125,41 @@ func (uc *UserController) RegisterHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	registrationPayload := payload.NewRegistrationPayload(user)
-	userId, stringCode, err := uc.Register(registrationPayload, false)
+	user = payload.NewRegistrationPayload(user)
+	stringCode, err := uc.Register(user, false)
 	if err != nil {
 		text, _ := uc.LanguageController.GetStringByCode(r, stringCode.Code)
 		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, text))
 		return
 	}
 
+	subject, _ := uc.LanguageController.GetStringByCode(r, "EMAIL_REGISTRATION_CONFIRMATION")
+	link := fmt.Sprintf("%s/api/authorize/inner/confirm/?email=%s&hash=%s", "https://"+r.Host, user.Email, user.Hash)
+	contentValues := map[string]string{"userName": user.Name, "link": link}
+	content, _ := uc.LanguageController.GetFormattedStringByCode(r, "EMAIL_REGISTRATION_CONFIRMATION_CONTENT", contentValues)
+	uc.MailController.SendMail(uc.MailController.DefaultEmailFrom, user.Email, subject, content)
+
 	render.JSON(w, r, struct {
 		UserId uint `json:"userId"`
-	}{userId})
+	}{user.ID})
 }
 
-func (uc *UserController) Register(registrationPayload *payload.RegistrationPayload, skipFieldsValidation bool) (uint, *language.StringCode, error) {
+func (uc *UserController) Register(user *model.User, skipFieldsValidation bool) (*language.StringCode, error) {
 	if !skipFieldsValidation {
-		if err := uc.HelperInteractor.ValidateRegistrationFields(registrationPayload); err != nil {
-			return 0, language.NewStringCode("REGISTRATION_INVALID_FIELDS"), err
+		if err := uc.HelperInteractor.ValidateRegistrationFields(user); err != nil {
+			return language.NewStringCode("REGISTRATION_INVALID_FIELDS"), err
 		}
 	}
 
-	userId, err := uc.UserInteractor.Add(registrationPayload.User)
+	err := uc.UserInteractor.Add(user)
 	if err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return 0, language.NewStringCode("EMAIL_ALREADY_EXISTS"), err
+			return language.NewStringCode("EMAIL_ALREADY_EXISTS"), err
 		}
-		return 0, language.NewStringCode("EMAIL_ALREADY_EXISTS"), err
+		return language.NewStringCode("EMAIL_ALREADY_EXISTS"), err
 	}
 
-	return userId, language.NewStringCode(""), nil
+	return language.NewStringCode(""), nil
 }
 
 func (uc *UserController) CheckUserWithNameExistsHandler(w http.ResponseWriter, r *http.Request) {
@@ -201,13 +194,41 @@ func (uc *UserController) CheckUserWithNameExists(userName string) bool {
 func (uc *UserController) GetUserShortHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId").(uint)
 
-	user, err := uc.UserInteractor.Get(userId)
+	user, err := uc.UserInteractor.GetById(userId)
 	if err != nil {
 		render.Render(w, r, ErrInvalidRequest(err, http.StatusNotFound, "User not found"))
 		return
 	}
 
 	render.JSON(w, r, *payload.NewUserShortPayload(user))
+}
+
+func (uc *UserController) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Request) {
+	email := r.URL.Query().Get("email")
+	hash := r.URL.Query().Get("hash")
+	if email == "" || hash == "" {
+		render.Render(w, r, ErrInvalidRequest(errors.New("no required fields found"), http.StatusBadRequest, "No required fields found"))
+		return
+	}
+
+	user := &model.User{}
+	err := uc.UserInteractor.GetWhere(user, map[string]interface{}{"active": false, "email": email, "hash": hash})
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusNotFound, "User not found"))
+		return
+	}
+
+	user = &model.User{
+		ID:     user.ID,
+		Active: true,
+	}
+	err = uc.UserInteractor.Updates(user)
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err, http.StatusInternalServerError, "Cannot update user"))
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (uc *UserController) UpdateUserPictureHandler(w http.ResponseWriter, r *http.Request) {

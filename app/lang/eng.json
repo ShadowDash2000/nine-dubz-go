@@ -32,6 +32,14 @@
     {
       "code": "REQUEST_NO_PICTURE_FILE",
       "text": "No picture file"
+    },
+    {
+      "code": "EMAIL_REGISTRATION_CONFIRMATION",
+      "text": "Confirm your registration on Nine Dubz"
+    },
+    {
+      "code": "EMAIL_REGISTRATION_CONFIRMATION_CONTENT",
+      "text": "Hi, {userName}!\n\nYou have received this email because you have registered on Nine Dubz website\n\nPlease, confirm your registration by following this link: {link}"
     }
   ]
 }

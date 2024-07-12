@@ -2,21 +2,38 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"log"
 	"os"
 )
 
 type S3Repository struct {
-	Bucket string
+	AccessKey string
+	SecretKey string
+	Bucket    string
+}
+
+func NewS3Repository(accessKey, secretKey, bucket string) *S3Repository {
+	return &S3Repository{
+		AccessKey: accessKey,
+		SecretKey: secretKey,
+		Bucket:    bucket,
+	}
 }
 
 func (sr *S3Repository) GetS3Client() *s3.Client {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(
+		context.TODO(),
+		config.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(sr.AccessKey, sr.SecretKey, ""),
+		),
+	)
 	if err != nil {
-		log.Fatalf("unable to load SDK config, %v", err)
+		fmt.Println("unable to load SDK config, %v", err)
+		return nil
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -36,7 +53,7 @@ func (sr *S3Repository) PutObject(file *os.File, key string) (*s3.PutObjectOutpu
 		Body:   file,
 	})
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 		return nil, err
 	}
 

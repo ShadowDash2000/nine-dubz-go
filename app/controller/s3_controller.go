@@ -1,8 +1,8 @@
 package controller
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"log"
 	"nine-dubz/app/model"
 	"nine-dubz/app/usecase"
 	"os"
@@ -13,16 +13,22 @@ type S3Controller struct {
 }
 
 func NewS3Controller() *S3Controller {
+	accessKey, ok := os.LookupEnv("S3_ACCESS_KEY")
+	if !ok {
+		fmt.Println("S3_ACCESS_KEY environment variable not set")
+	}
+	secretKey, ok := os.LookupEnv("S3_SECRET_KEY")
+	if !ok {
+		fmt.Println("S3_SECRET_KEY environment variable not set")
+	}
 	bucket, ok := os.LookupEnv("S3_BUCKET")
 	if !ok {
-		log.Fatalln("S3_BUCKET environment variable not set")
+		fmt.Println("S3_BUCKET environment variable not set")
 	}
 
 	return &S3Controller{
 		S3Interactor: usecase.S3Interactor{
-			S3Repository: &S3Repository{
-				Bucket: bucket,
-			},
+			S3Repository: NewS3Repository(accessKey, secretKey, bucket),
 		},
 	}
 }

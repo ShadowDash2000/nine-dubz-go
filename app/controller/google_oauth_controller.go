@@ -91,20 +91,21 @@ func (goc *GoogleOauthController) Authorize(w http.ResponseWriter, r *http.Reque
 	tokenCookie, stringCode, err := goc.UserController.Login(loginPayload, false)
 	if err == nil {
 		http.SetCookie(w, tokenCookie)
-		http.Redirect(w, r, "/", http.StatusOK)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	// Try to register
 	registrationPayload := payload.NewRegistrationPayload(user)
-	userId, stringCode, err := goc.UserController.Register(registrationPayload, true)
+	registrationPayload.Active = true
+
+	stringCode, err = goc.UserController.Register(registrationPayload, true)
 	if err != nil {
 		text, _ := goc.LanguageController.GetStringByCode(r, stringCode.Code)
 		render.Render(w, r, ErrInvalidRequest(err, http.StatusBadRequest, text))
 		return
 	} else {
-		user.ID = userId
-		tokenCookie, err := goc.UserController.GetTokenCookie(user)
+		tokenCookie, err := goc.UserController.GetTokenCookie(registrationPayload)
 		if err != nil {
 			text, _ := goc.LanguageController.GetStringByCode(r, "TOKEN_FAILED_TO_CREATE")
 			render.Render(w, r, ErrInvalidRequest(err, http.StatusInternalServerError, text))
@@ -112,6 +113,6 @@ func (goc *GoogleOauthController) Authorize(w http.ResponseWriter, r *http.Reque
 		}
 
 		http.SetCookie(w, tokenCookie)
-		http.Redirect(w, r, "/", http.StatusOK)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }

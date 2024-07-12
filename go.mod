@@ -10,6 +10,7 @@ require (
 	github.com/go-chi/render v1.0.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/websocket v1.5.3
+	github.com/u2takey/ffmpeg-go v0.5.0
 	golang.org/x/oauth2 v0.21.0
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.10
@@ -17,6 +18,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	github.com/aws/aws-sdk-go v1.38.20 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.3 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.26 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.11 // indirect
@@ -35,4 +37,6 @@ require (
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/u2takey/go-utils v0.3.1 // indirect
 )

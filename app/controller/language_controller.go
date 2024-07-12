@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"nine-dubz/app/usecase"
+	"strings"
 )
 
 type LanguageController struct {
@@ -24,6 +25,19 @@ func (lc *LanguageController) GetLanguageCode(r *http.Request) string {
 
 func (lc *LanguageController) GetStringByCode(r *http.Request, code string) (string, error) {
 	return lc.LanguageInteractor.GetStringByCode(code, lc.GetLanguageCode(r))
+}
+
+func (lc *LanguageController) GetFormattedStringByCode(r *http.Request, code string, values map[string]string) (string, error) {
+	languageString, err := lc.LanguageInteractor.GetStringByCode(code, lc.GetLanguageCode(r))
+	if err != nil {
+		return "", err
+	}
+
+	for key, value := range values {
+		languageString = strings.ReplaceAll(languageString, "{"+key+"}", value)
+	}
+
+	return languageString, nil
 }
 
 func (lc *LanguageController) Language(next http.Handler) http.Handler {

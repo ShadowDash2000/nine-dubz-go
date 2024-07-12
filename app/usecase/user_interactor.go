@@ -8,7 +8,7 @@ type UserInteractor struct {
 	UserRepository UserRepository
 }
 
-func (ui *UserInteractor) Add(user *model.User) (uint, error) {
+func (ui *UserInteractor) Add(user *model.User) error {
 	return ui.UserRepository.Add(user)
 }
 
@@ -24,8 +24,16 @@ func (ui *UserInteractor) Updates(user *model.User) error {
 	return ui.UserRepository.Updates(user)
 }
 
-func (ui *UserInteractor) Get(id uint) (*model.User, error) {
-	return ui.UserRepository.Get(id)
+func (ui *UserInteractor) Get(user *model.User) error {
+	return ui.UserRepository.Get(user)
+}
+
+func (ui *UserInteractor) GetWhere(user *model.User, where map[string]interface{}) error {
+	return ui.UserRepository.GetWhere(user, where)
+}
+
+func (ui *UserInteractor) GetById(id uint) (*model.User, error) {
+	return ui.UserRepository.GetById(id)
 }
 
 func (ui *UserInteractor) GetByName(name string) (*model.User, error) {

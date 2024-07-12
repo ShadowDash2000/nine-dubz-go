@@ -23,10 +23,11 @@ type FileController struct {
 	FileInteractor     usecase.FileInteractor
 	SocketInteractor   usecase.SocketInteractor
 	S3Controller       *S3Controller
+	VideoController    *VideoController
 	LanguageController *LanguageController
 }
 
-func NewFileController(db *gorm.DB, lc *LanguageController, sc *S3Controller) *FileController {
+func NewFileController(db *gorm.DB, lc *LanguageController, vc *VideoController, sc *S3Controller) *FileController {
 	return &FileController{
 		FileInteractor: usecase.FileInteractor{
 			FileRepository: &FileRepository{
@@ -38,6 +39,7 @@ func NewFileController(db *gorm.DB, lc *LanguageController, sc *S3Controller) *F
 				Clients: make(map[*websocket.Conn]bool),
 			},
 		},
+		VideoController:    vc,
 		S3Controller:       sc,
 		LanguageController: lc,
 	}
@@ -132,10 +134,18 @@ func (fc *FileController) SocketUpload(w http.ResponseWriter, r *http.Request, f
 
 	_, err = fc.S3Controller.Upload(file)
 	if err != nil {
+		fc.FileInteractor.Remove(file.ID)
 		return nil, err
 	}
 
-	os.Remove(file.Path)
+	go func() {
+		err = fc.VideoController.SplitVideoToThumbnails(file.Path, "upload/thumbs/"+file.Name)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		os.Remove(file.Path)
+	}()
 
 	return file, nil
 }
