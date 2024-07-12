@@ -1,0 +1,45 @@
+{
+  "code": "ru",
+  "strings": [
+    {
+      "code": "EMAIL_ALREADY_EXISTS",
+      "text": "Пользователь с таким email уже существует"
+    },
+    {
+      "code": "REGISTRATION_INVALID_FIELDS",
+      "text": "Некорректные поля регистрации"
+    },
+    {
+      "code": "LOGIN_USER_NOT_FOUND",
+      "text": "Пользователь не найден"
+    },
+    {
+      "code": "LOGIN_FAILED_TO_CREATE_TOKEN",
+      "text": "Ошибка при создании токена"
+    },
+    {
+      "code": "GOOGLE_CANT_AUTHORIZE",
+      "text": "Не удалось авторизоваться"
+    },
+    {
+      "code": "TOKEN_FAILED_TO_CREATE",
+      "text": "Ошибка при создании токена"
+    },
+    {
+      "code": "REQUEST_MAX_SIZE_LIMIT",
+      "text": "Файл слишком болошой"
+    },
+    {
+      "code": "REQUEST_NO_PICTURE_FILE",
+      "text": "Нет файла с картинкой"
+    },
+    {
+      "code": "EMAIL_REGISTRATION_CONFIRMATION",
+      "text": "Подтвердите вашу регистрацию на Nine Dubz"
+    },
+    {
+      "code": "EMAIL_REGISTRATION_CONFIRMATION_CONTENT",
+      "text": "Привет, {userName}!\nВы получили данное письмо, так как зарегистрировались на сайте Nine Dubz\n\nПожалуйста, подтвердите регистрацию проследовав по этой ссылке: {link}"
+    }
+  ]
+}

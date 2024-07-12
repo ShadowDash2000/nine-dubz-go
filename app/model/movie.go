@@ -3,11 +3,13 @@ package model
 import "gorm.io/gorm"
 
 type Movie struct {
-	gorm.Model
-	Poster      string `json:"poster"`
+	*gorm.Model
+	IsPublished bool   `json:"-" gorm:"default:false"`
+	Poster      string `json:"poster,omitempty"`
 	Name        string `json:"name"`
 	DubDate     string `json:"dubDate"`
 	VoiceActors string `json:"voiceActors"`
 	Genre       string `json:"genre"`
-	VideoUrl    string `json:"videoUrl"`
+	VideoId     *uint  `json:"-" gorm:"foreignKey:VideoId;references:ID;OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	Video       *File  `json:"video"`
 }

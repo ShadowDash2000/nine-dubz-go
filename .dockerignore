@@ -1,0 +1,8 @@
+**/Dockerfile
+**/.dockerignore
+
+**/upload
+**/routes.md
+
+**/*.exe
+**/*.mp4

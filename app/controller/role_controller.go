@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"gorm.io/gorm"
@@ -28,7 +29,7 @@ func NewRoleController(db *gorm.DB, tokenController *TokenController) *RoleContr
 	}
 }
 
-func (rc *RoleController) Add(w http.ResponseWriter, r *http.Request) {
+func (rc *RoleController) AddHandler(w http.ResponseWriter, r *http.Request) {
 	role := &model.Role{}
 	err := json.NewDecoder(r.Body).Decode(&role)
 	if err != nil {
@@ -50,7 +51,7 @@ func (rc *RoleController) Add(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, id)
 }
 
-func (rc *RoleController) Get(w http.ResponseWriter, r *http.Request) {
+func (rc *RoleController) GetHandler(w http.ResponseWriter, r *http.Request) {
 	roleId, err := strconv.ParseUint(chi.URLParam(r, "roleId"), 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid role id", http.StatusBadRequest)
@@ -90,14 +91,13 @@ func (rc *RoleController) Permission(next http.Handler) http.Handler {
 		routePattern := chi.RouteContext(r.Context()).RoutePattern()
 		method := r.Method
 
-		isUserHavePermission, user, err := rc.RoleInteractor.CheckUserPermission(tokenCookie.Value, routePattern, method)
-		if err != nil || !isUserHavePermission {
-			render.Render(w, r, ErrInvalidRequest(err, http.StatusForbidden, "You don't have permission"))
+		isUserHavePermission, user := rc.RoleInteractor.CheckUserPermission(tokenCookie.Value, routePattern, method)
+		if !isUserHavePermission {
+			render.Render(w, r, ErrInvalidRequest(errors.New("you don't have permission"), http.StatusForbidden, "You don't have permission"))
 			return
 		}
 
 		ctx = context.WithValue(ctx, "userId", user.ID)
-
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

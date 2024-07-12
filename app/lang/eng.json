@@ -1,0 +1,45 @@
+{
+  "code": "eng",
+  "strings": [
+    {
+      "code": "EMAIL_ALREADY_EXISTS",
+      "text": "User with this email already exists"
+    },
+    {
+      "code": "REGISTRATION_INVALID_FIELDS",
+      "text": "Invalid registration fields"
+    },
+    {
+      "code": "LOGIN_USER_NOT_FOUND",
+      "text": "User not found"
+    },
+    {
+      "code": "LOGIN_FAILED_TO_CREATE_TOKEN",
+      "text": "Failed to create token"
+    },
+    {
+      "code": "GOOGLE_CANT_AUTHORIZE",
+      "text": "Can't authorize"
+    },
+    {
+      "code": "TOKEN_FAILED_TO_CREATE",
+      "text": "Failed to create token"
+    },
+    {
+      "code": "REQUEST_MAX_SIZE_LIMIT",
+      "text": "File is too large"
+    },
+    {
+      "code": "REQUEST_NO_PICTURE_FILE",
+      "text": "No picture file"
+    },
+    {
+      "code": "EMAIL_REGISTRATION_CONFIRMATION",
+      "text": "Confirm your registration on Nine Dubz"
+    },
+    {
+      "code": "EMAIL_REGISTRATION_CONFIRMATION_CONTENT",
+      "text": "Hi, {userName}!\n\nYou have received this email because you have registered on Nine Dubz website\n\nPlease, confirm your registration by following this link: {link}"
+    }
+  ]
+}

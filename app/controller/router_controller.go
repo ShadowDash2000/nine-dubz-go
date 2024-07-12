@@ -14,37 +14,56 @@ import (
 type RouterController struct {
 	Router                chi.Mux
 	DB                    *gorm.DB
+	LanguageController    LanguageController
 	MovieController       MovieController
 	RoleController        RoleController
 	ApiMethodController   ApiMethodController
 	UserController        UserController
 	TokenController       TokenController
 	GoogleOauthController GoogleOauthController
+	FileController        FileController
+	S3Controller          S3Controller
 }
 
 func NewRouterController(db gorm.DB) *RouterController {
-	tokenController := *NewTokenController("nine-dubz-token-secret", &db)
+	tc := *NewTokenController("nine-dubz-token-secret", &db)
+	lc := *NewLanguageController("lang")
+	sc := *NewS3Controller()
+	vc := *NewVideoController()
+	fc := *NewFileController(&db, &lc, &vc, &sc)
+	mc := *NewMovieController(&db, &fc)
+	rc := *NewRoleController(&db, &tc)
+	amc := *NewApiMethodController(&db)
+	uc := *NewUserController(&db, &tc, &lc, &fc)
+	goc := *NewGoogleOauthController(&db, &lc, &uc)
 
 	return &RouterController{
 		Router:                *chi.NewRouter(),
 		DB:                    &db,
-		MovieController:       *NewMovieController(&db),
-		RoleController:        *NewRoleController(&db, &tokenController),
-		ApiMethodController:   *NewApiMethodController(&db),
-		UserController:        *NewUserController(&db, &tokenController),
-		TokenController:       tokenController,
-		GoogleOauthController: *NewGoogleOauthController(),
+		LanguageController:    lc,
+		MovieController:       mc,
+		RoleController:        rc,
+		ApiMethodController:   amc,
+		UserController:        uc,
+		TokenController:       tc,
+		GoogleOauthController: goc,
+		FileController:        fc,
+		S3Controller:          sc,
 	}
 }
 
 func (rc *RouterController) HandleRoute() *chi.Mux {
-	rc.Router.Use(middleware.Logger)
+	//rc.Router.Use(middleware.Logger)
 	rc.Router.Use(middleware.Recoverer)
 	rc.Router.Use(middleware.URLFormat)
 	rc.Router.Use(render.SetContentType(render.ContentTypeJSON))
+	rc.Router.Use(rc.LanguageController.Language)
 
 	rc.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "public/index.html")
+	})
+	rc.Router.Get("/socket-test", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "public/socket_test.html")
 	})
 
 	rc.Router.Get("/authorize", rc.GoogleOauthController.Authorize)
@@ -55,62 +74,85 @@ func (rc *RouterController) HandleRoute() *chi.Mux {
 				/**
 				TODO remove in future
 				*/
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 
 				next.ServeHTTP(w, r)
 			})
 		})
 
+		r.Route("/file", func(r chi.Router) {
+			r.Route("/stream/{fileName}", func(r chi.Router) {
+				r.Get("/", rc.FileController.StreamFile)
+			})
+		})
+
 		r.Route("/movie", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.MovieController.Add)
-			r.With(rc.RoleController.Permission).With(rc.Pagination).Get("/", rc.MovieController.GetAll)
+			r.With(rc.Pagination).Get("/", rc.MovieController.GetAllHandler)
+
+			r.Route("/upload", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Get("/", rc.MovieController.AddHandler)
+			})
 
 			r.Route("/{movieId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.MovieController.Get)
+				r.Get("/", rc.MovieController.GetHandler)
 			})
 		})
 		r.Route("/role", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.RoleController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.RoleController.AddHandler)
 
 			r.Route("/{roleId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.RoleController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.RoleController.GetHandler)
 			})
 		})
 		r.Route("/api-method", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.ApiMethodController.Add)
+			r.With(rc.RoleController.Permission).Post("/", rc.ApiMethodController.AddHandler)
 
 			r.Route("/{apiMethodId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.ApiMethodController.Get)
+				r.With(rc.RoleController.Permission).Get("/", rc.ApiMethodController.GetHandler)
 			})
 		})
 
 		r.Route("/user", func(r chi.Router) {
-			r.With(rc.RoleController.Permission).Post("/", rc.UserController.Add)
-			r.With(rc.RoleController.Permission).Get("/short", rc.UserController.GetUserShort)
-
-			r.Route("/{userId}", func(r chi.Router) {
-				r.With(rc.RoleController.Permission).Get("/", rc.UserController.Get)
+			r.Route("/get-short", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Get("/", rc.UserController.GetUserShortHandler)
 			})
 
-			r.Get("/check-by-name", rc.UserController.CheckUserWithNameExists)
+			r.Route("/get/{userId}", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Get("/", rc.UserController.GetHandler)
+			})
+
+			r.Route("/check-by-name", func(r chi.Router) {
+				r.Get("/", rc.UserController.CheckUserWithNameExistsHandler)
+			})
+
+			r.Route("/update-picture", func(r chi.Router) {
+				r.With(rc.RoleController.Permission).Post("/", rc.UserController.UpdateUserPictureHandler)
+			})
 		})
 
+		/**
+		TODO Add restriction if user is already authorized
+		*/
 		r.Route("/authorize", func(r chi.Router) {
 			r.Route("/google", func(r chi.Router) {
-				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrl)
+				r.Get("/", rc.GoogleOauthController.Authorize)
+				r.Get("/get-url", rc.GoogleOauthController.GetConsentPageUrlHandler)
 			})
 			r.Route("/inner", func(r chi.Router) {
-				r.Post("/register", rc.UserController.Register)
-				r.Post("/login", rc.UserController.Login)
+				r.Route("/register", func(r chi.Router) {
+					r.Post("/", rc.UserController.RegisterHandler)
+				})
+				r.Route("/login", func(r chi.Router) {
+					r.Post("/", rc.UserController.LoginHandler)
+				})
+				r.Route("/confirm", func(r chi.Router) {
+					r.Get("/", rc.UserController.ConfirmRegistrationHandler)
+				})
 			})
 		})
 	})
-
-	/*fmt.Println(docgen.MarkdownRoutesDoc(&rc.Router, docgen.MarkdownOpts{
-		ProjectPath: "github.com/go-chi/chi/v5",
-		Intro:       "Welcome to the chi/_examples/rest generated docs.",
-	}))*/
 
 	return &rc.Router
 }
@@ -141,9 +183,9 @@ type ErrResponse struct {
 	Err            error `json:"-"` // low-level runtime error
 	HTTPStatusCode int   `json:"-"` // http response status code
 
-	StatusText string `json:"status"`          // user-level status message
-	AppCode    int64  `json:"code,omitempty"`  // application-specific error code
-	ErrorText  string `json:"error,omitempty"` // application-level error message, for debugging
+	StatusText string `json:"status"`         // user-level status message
+	AppCode    int64  `json:"code,omitempty"` // application-specific error code
+	ErrorText  string `json:"-"`              // application-level error message, for debugging
 }
 
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {

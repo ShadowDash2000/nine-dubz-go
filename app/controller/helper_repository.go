@@ -2,7 +2,7 @@ package controller
 
 import (
 	"errors"
-	"nine-dubz/app/model/payload"
+	"nine-dubz/app/model"
 	"regexp"
 )
 
@@ -32,7 +32,7 @@ func (hr *HelperRepository) ValidatePassword(password string) bool {
 	return true
 }
 
-func (hr *HelperRepository) ValidateRegistrationFields(user *payload.RegistrationPayload) error {
+func (hr *HelperRepository) ValidateRegistrationFields(user *model.User) error {
 	if !hr.ValidateUserName(user.Name) {
 		return errors.New("incorrect user name")
 	}

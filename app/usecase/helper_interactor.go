@@ -1,6 +1,8 @@
 package usecase
 
-import "nine-dubz/app/model/payload"
+import (
+	"nine-dubz/app/model"
+)
 
 type HelperInteractor struct {
 	HelperRepository HelperRepository
@@ -18,6 +20,6 @@ func (hi *HelperInteractor) ValidatePassword(password string) bool {
 	return hi.HelperRepository.ValidateUserName(password)
 }
 
-func (hi *HelperInteractor) ValidateRegistrationFields(user *payload.RegistrationPayload) error {
+func (hi *HelperInteractor) ValidateRegistrationFields(user *model.User) error {
 	return hi.HelperRepository.ValidateRegistrationFields(user)
 }

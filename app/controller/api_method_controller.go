@@ -25,7 +25,7 @@ func NewApiMethodController(db *gorm.DB) *ApiMethodController {
 	}
 }
 
-func (uc *ApiMethodController) Add(w http.ResponseWriter, r *http.Request) {
+func (uc *ApiMethodController) AddHandler(w http.ResponseWriter, r *http.Request) {
 	apiMethod := &model.ApiMethod{}
 	err := json.NewDecoder(r.Body).Decode(&apiMethod)
 	if err != nil {
@@ -47,7 +47,7 @@ func (uc *ApiMethodController) Add(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, id)
 }
 
-func (uc *ApiMethodController) Get(w http.ResponseWriter, r *http.Request) {
+func (uc *ApiMethodController) GetHandler(w http.ResponseWriter, r *http.Request) {
 	apiMethodId, err := strconv.ParseUint(chi.URLParam(r, "apiMethodId"), 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid api method id", http.StatusBadRequest)

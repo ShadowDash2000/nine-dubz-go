@@ -15,10 +15,10 @@ func NewMovieRepository(db *gorm.DB) *MovieRepository {
 	}
 }
 
-func (mr *MovieRepository) Add(movie *model.Movie) (uint, error) {
+func (mr *MovieRepository) Add(movie *model.Movie) error {
 	result := mr.DB.Create(&movie)
 
-	return movie.ID, result.Error
+	return result.Error
 }
 
 func (mr *MovieRepository) Remove(id uint) error {
@@ -27,22 +27,33 @@ func (mr *MovieRepository) Remove(id uint) error {
 	return result.Error
 }
 
-func (mr *MovieRepository) Update(movie *model.Movie) error {
+func (mr *MovieRepository) Save(movie *model.Movie) error {
 	result := mr.DB.Save(&movie)
+
+	return result.Error
+}
+
+func (mr *MovieRepository) Updates(movie *model.Movie) error {
+	result := mr.DB.Updates(&movie)
 
 	return result.Error
 }
 
 func (mr *MovieRepository) Get(id uint) (*model.Movie, error) {
 	movie := &model.Movie{}
-	result := mr.DB.First(&movie, id)
+	result := mr.DB.Preload("Video").First(&movie, id)
 
 	return movie, result.Error
 }
 
 func (mr *MovieRepository) GetAll(pagination *model.Pagination) (*[]model.Movie, error) {
 	movies := &[]model.Movie{}
-	result := mr.DB.Limit(pagination.Limit).Offset(pagination.Offset).Find(&movies)
+	result := mr.DB.
+		Preload("Video").
+		Limit(pagination.Limit).
+		Offset(pagination.Offset).
+		Where("is_published = 1").
+		Find(&movies)
 
 	return movies, result.Error
 }
