@@ -1,0 +1,95 @@
+package tokenauthorize
+
+import (
+	"fmt"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/net/context"
+	"net/http"
+	"time"
+)
+
+type TokenAuthorize struct {
+	SecretKey string
+}
+
+func New(secretKey string) *TokenAuthorize {
+	return &TokenAuthorize{
+		SecretKey: secretKey,
+	}
+}
+
+func (ta *TokenAuthorize) CreateToken(subject string) (string, *jwt.RegisteredClaims, error) {
+	claims := &jwt.RegisteredClaims{
+		Subject:   subject,
+		Issuer:    "nine-dubz",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 30)),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedString, err := token.SignedString([]byte(ta.SecretKey))
+	if err != nil {
+		return "", claims, err
+	}
+
+	return signedString, claims, err
+}
+
+func (ta *TokenAuthorize) VerifyToken(signedString string) (*jwt.Token, error) {
+	token, err := jwt.Parse(signedString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(ta.SecretKey), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	return token, nil
+}
+
+func (ta *TokenAuthorize) GetTokenCookie(subject string) (*http.Cookie, error) {
+	signedString, claims, err := ta.CreateToken(subject)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenCookie := http.Cookie{
+		Name:     "token",
+		Value:    signedString,
+		Path:     "/",
+		Expires:  claims.ExpiresAt.Time,
+		MaxAge:   0,
+		Secure:   false,
+		HttpOnly: false,
+		SameSite: http.SameSiteDefaultMode,
+	}
+
+	return &tokenCookie, nil
+}
+
+func (ta *TokenAuthorize) IsAuthorizedMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenCookie, err := r.Cookie("token")
+		if err != nil {
+			http.Error(w, "Token cookie not found", http.StatusUnauthorized)
+			return
+		}
+
+		if _, err = ta.VerifyToken(tokenCookie.Value); err != nil {
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, "token", tokenCookie.Value)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}

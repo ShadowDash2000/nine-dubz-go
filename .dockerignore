@@ -1,5 +1,9 @@
 **/Dockerfile
 **/.dockerignore
+**/.gitignore
+**/.idea
+**/.git
+
 
 **/upload
 **/routes.md
