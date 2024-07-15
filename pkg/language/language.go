@@ -1,9 +1,9 @@
 package language
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"golang.org/x/net/context"
 	"io"
 	"net/http"
 	"os"
@@ -91,7 +91,7 @@ func (rp *Repository) GetFormattedStringByCode(code string, values map[string]st
 	return languageString, nil
 }
 
-func (rp *Repository) SetLanguageContextMiddleware(next http.Handler) http.Handler {
+func (rp *Repository) SetLanguageContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		languageCode := ""
 		languageCookie, err := r.Cookie("lang")

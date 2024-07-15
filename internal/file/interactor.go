@@ -12,7 +12,7 @@ type Interactor interface {
 	Updates(file *File) error
 	Get(id uint) (*File, error)
 	VerifyFileType(buff []byte, types []string) (bool, string)
-	CopyTmpFile(uploadPath string, tmpFilePath string, header *UploadHeader) (*File, error)
-	WriteFileFromSocket(tmpPath string, fileTypes []string, header *UploadHeader, conn *websocket.Conn) (string, error)
+	CopyTmpFile(uploadPath string, tmpFilePath string, fileName string) (*File, error)
+	WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, conn *websocket.Conn) (string, error)
 	SaveFile(path string, fileName string, file multipart.File) (*File, error)
 }

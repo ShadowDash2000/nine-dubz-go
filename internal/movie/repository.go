@@ -2,7 +2,7 @@ package movie
 
 import (
 	"gorm.io/gorm"
-	"nine-dubz/model"
+	"nine-dubz/internal/pagination"
 )
 
 type Repository struct {
@@ -15,8 +15,8 @@ func (mr *Repository) Add(movie *Movie) error {
 	return result.Error
 }
 
-func (mr *Repository) Remove(id uint) error {
-	result := mr.DB.Delete(&Movie{}, id)
+func (mr *Repository) Delete(userId uint, code string) error {
+	result := mr.DB.Where("user_id = ? AND code = ?", userId, code).Delete(&Movie{})
 
 	return result.Error
 }
@@ -33,14 +33,39 @@ func (mr *Repository) Updates(movie *Movie) error {
 	return result.Error
 }
 
-func (mr *Repository) Get(id uint) (*Movie, error) {
+func (mr *Repository) UpdatesWhere(movie *Movie, where map[string]interface{}) error {
+	result := mr.DB.Where(where).Updates(&movie)
+
+	return result.Error
+}
+
+func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
-	result := mr.DB.Preload("Video").First(&movie, id)
+	result := mr.DB.Preload("Video").First(&movie, "code = ?", code)
 
 	return movie, result.Error
 }
 
-func (mr *Repository) GetAll(pagination *model.Pagination) (*[]Movie, error) {
+func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movie, error) {
+	movie := &Movie{}
+	result := mr.DB.Preload("Video").Where(where).First(&movie, "code = ?", code)
+
+	return movie, result.Error
+}
+
+func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pagination) (*[]Movie, error) {
+	movies := &[]Movie{}
+	result := mr.DB.
+		Preload("Video").
+		Where("user_id = ?", userId).
+		Limit(pagination.Limit).
+		Offset(pagination.Offset).
+		Find(&movies)
+
+	return movies, result.Error
+}
+
+func (mr *Repository) GetMultiple(pagination *pagination.Pagination) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
 		Preload("Video").
