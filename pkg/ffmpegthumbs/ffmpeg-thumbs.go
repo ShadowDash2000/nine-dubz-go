@@ -61,7 +61,7 @@ func (vr *FfmpegThumbs) SplitVideoToThumbnails(filePath string, outputPath strin
 		timeFormat := "15:04:05.000"
 
 		timeString := frameStart.Format(timeFormat) + " --> " + frameEnd.Format(timeFormat)
-		imagePath := fmt.Sprintf("%s/img%d.jpg", outputPath, i)
+		imagePath := fmt.Sprintf("/%s/img%d.jpg", outputPath, i)
 
 		file.Write([]byte(timeString + "\n"))
 		file.Write([]byte(imagePath + "\n\n"))
