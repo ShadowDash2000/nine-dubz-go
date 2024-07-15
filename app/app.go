@@ -99,7 +99,7 @@ func (app *App) Start() {
 	})
 
 	workDir, _ := os.Getwd()
-	filesDir := http.Dir(filepath.Join(workDir, "upload/thumbs"))
+	filesDir := http.Dir(filepath.Join(workDir, "upload/"))
 	FileServer(app.Router, "/upload", filesDir)
 
 	app.Router.Route("/api", func(r chi.Router) {
