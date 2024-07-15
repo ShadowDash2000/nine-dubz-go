@@ -3,9 +3,7 @@ package user
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"golang.org/x/net/context"
 	"net/http"
 	"nine-dubz/internal/helper"
 	"nine-dubz/internal/token"
@@ -114,7 +112,8 @@ func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if ok := h.UserUseCase.ConfirmRegistration(email, hash); !ok {
+	userId, ok := h.UserUseCase.ConfirmRegistration(email, hash)
+	if !ok {
 		http.Error(w, "Can't confirm registration", http.StatusBadRequest)
 		return
 	}
@@ -123,6 +122,8 @@ func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return
 	}
+
+	h.TokenUseCase.Add(userId, tokenCookie.Value)
 
 	http.SetCookie(w, tokenCookie)
 
@@ -146,24 +147,4 @@ func (h *Handler) UpdatePictureHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update picture", http.StatusBadRequest)
 		return
 	}
-}
-
-func (h *Handler) PermissionMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenString := r.Context().Value("token").(string)
-
-		routePattern := chi.RouteContext(r.Context()).RoutePattern()
-		method := r.Method
-
-		userId, ok := h.UserUseCase.CheckUserPermission(tokenString, routePattern, method)
-		if !ok {
-			http.Error(w, "Permission denied", http.StatusForbidden)
-			return
-		}
-
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userId", userId)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }

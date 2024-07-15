@@ -75,15 +75,15 @@ func (uc *UseCase) VerifyFileType(buff []byte, types []string) (bool, string) {
 	return uc.FileInteractor.VerifyFileType(buff, types)
 }
 
-func (uc *UseCase) WriteFileFromSocket(fileTypes []string, header *UploadHeader, conn *websocket.Conn) (*File, error) {
-	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, header, conn)
+func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*File, error) {
+	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, conn)
 	if err != nil {
 		return nil, err
 	}
 
 	conn.Close()
 
-	file, err := uc.FileInteractor.CopyTmpFile("upload/video", tmpFile, header)
+	file, err := uc.FileInteractor.CopyTmpFile("upload/video", tmpFile, fileName)
 	if err != nil {
 		return nil, err
 	}

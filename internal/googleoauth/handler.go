@@ -4,19 +4,22 @@ import (
 	"github.com/go-chi/render"
 	"net/http"
 	"nine-dubz/internal/token"
+	"nine-dubz/internal/user"
 	"nine-dubz/pkg/tokenauthorize"
 	"strings"
 )
 
 type Handler struct {
 	GoogleOAuthUseCase *UseCase
+	UserHandler        *user.Handler
 	TokenUseCase       *token.UseCase
 	TokenAuthorize     *tokenauthorize.TokenAuthorize
 }
 
-func NewHandler(uc *UseCase, tuc *token.UseCase, ta *tokenauthorize.TokenAuthorize) *Handler {
+func NewHandler(uc *UseCase, uh *user.Handler, tuc *token.UseCase, ta *tokenauthorize.TokenAuthorize) *Handler {
 	return &Handler{
 		GoogleOAuthUseCase: uc,
+		UserHandler:        uh,
 		TokenUseCase:       tuc,
 		TokenAuthorize:     ta,
 	}

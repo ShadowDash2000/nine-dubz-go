@@ -2,7 +2,6 @@ package user
 
 import (
 	"errors"
-	"fmt"
 	"gorm.io/gorm"
 	"io"
 	"mime/multipart"
@@ -72,11 +71,15 @@ func (uc *UseCase) SendRegistrationEmail(to, subject, content string) error {
 	return uc.MailUseCase.SendMail(to, subject, content)
 }
 
-func (uc *UseCase) ConfirmRegistration(email, hash string) bool {
+/*
+*
+TODO update hash after confirmation
+*/
+func (uc *UseCase) ConfirmRegistration(email, hash string) (uint, bool) {
 	user := &User{}
 	err := uc.UserInteractor.GetWhere(user, map[string]interface{}{"active": false, "email": email, "hash": hash})
 	if err != nil {
-		return false
+		return 0, false
 	}
 
 	user = &User{
@@ -85,10 +88,10 @@ func (uc *UseCase) ConfirmRegistration(email, hash string) bool {
 	}
 	err = uc.UserInteractor.Updates(user)
 	if err != nil {
-		return false
+		return 0, false
 	}
 
-	return true
+	return user.ID, true
 }
 
 func (uc *UseCase) GetById(id uint) (*User, error) {
@@ -126,31 +129,26 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 	return nil
 }
 
-func (uc *UseCase) CheckUserPermission(tokenString string, routePattern string, method string) (uint, bool) {
-	userId, err := uc.TokenUseCase.GetUserIdByToken(tokenString)
-	if err != nil {
-		return 0, false
-	}
-	fmt.Println(userId)
+func (uc *UseCase) CheckUserPermission(userId uint, routePattern string, method string) bool {
 	roles, err := uc.UserInteractor.GetRolesByUserId(userId)
 	if err != nil {
-		return 0, false
+		return false
 	}
-	fmt.Println(roles)
+
 	var rolesIds []uint
 	for _, role := range roles {
 		if role.Code == "admin" {
-			return userId, true
+			return true
 		}
 
 		rolesIds = append(rolesIds, role.ID)
 	}
-	fmt.Println(rolesIds)
+
 	apiMethods, err := uc.RoleUseCase.GetApiMethodsByRolesIds(rolesIds)
 	if err != nil {
-		return 0, false
+		return false
 	}
-	fmt.Println(apiMethods)
+
 	isHavePermission := false
 	for _, apiMethod := range apiMethods {
 		if apiMethod.Path == routePattern && apiMethod.Method == method {
@@ -159,5 +157,5 @@ func (uc *UseCase) CheckUserPermission(tokenString string, routePattern string, 
 		}
 	}
 
-	return userId, isHavePermission
+	return isHavePermission
 }

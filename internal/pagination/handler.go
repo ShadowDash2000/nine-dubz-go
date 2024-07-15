@@ -1,13 +1,12 @@
-package middleware
+package pagination
 
 import (
 	"context"
 	"net/http"
-	"nine-dubz/model"
 	"strconv"
 )
 
-func PaginationMiddleware(next http.Handler) http.Handler {
+func SetPaginationContextMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
 		if err != nil || limit <= 0 {
@@ -19,7 +18,7 @@ func PaginationMiddleware(next http.Handler) http.Handler {
 			offset = -1
 		}
 
-		pagination := &model.Pagination{
+		pagination := &Pagination{
 			Limit:  limit,
 			Offset: offset,
 		}

@@ -11,3 +11,8 @@ type File struct {
 	Path         string `json:"path" gorm:"not null"`
 	Size         int64  `json:"size" gorm:"not null"`
 }
+
+type UploadStatus struct {
+	Status int    `json:"status"`
+	Error  string `json:"error,omitempty"`
+}

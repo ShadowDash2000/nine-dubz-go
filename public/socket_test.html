@@ -57,7 +57,7 @@ Status Messages: <output id="list"></output>
             ws.binaryType = 'arraybuffer';
             // Send filename and size to the server when the connection is opened.
             ws.onopen = function(evt) {
-                header = '{"filename":"' + file.name + '","size":' + file.size + '}';
+                header = '{"filename":"' + file.name + '","size":' + file.size + ',"movieCode":"vFJ2tdT53ax"}';
                 ws.send(header);
             };
             // Initiate the file transfer by reading the first block from disk.

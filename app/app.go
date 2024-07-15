@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httprate"
 	"github.com/go-chi/render"
 	"gorm.io/gorm"
 	"log"
@@ -17,6 +19,9 @@ import (
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 type App struct {
@@ -37,7 +42,7 @@ func (app *App) Start() {
 	fuc := file.New(app.DB)
 	tuc := token.New(app.DB)
 	ruc := role.New(app.DB)
-	movuc := movie.New(app.DB, fuc)
+	movuc := movie.New(app.DB)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc)
 
@@ -52,19 +57,26 @@ func (app *App) Start() {
 	if !ok {
 		log.Println("TOKEN_SECRET_KEY environment variable not set")
 	}
-	ta := tokenauthorize.New(tokenSecretKey)
+	ta := tokenauthorize.New(tokenSecretKey, "nine-dubz")
 
 	// Http handlers
 	uh := user.NewHandler(uuc, tuc, ta, lang)
 	fh := file.NewHandler(fuc)
-	mh := movie.NewHandler(movuc, ta, uh, fh)
-	goah := googleoauth.NewHandler(goauc, tuc, ta)
+	mh := movie.NewHandler(movuc, uh, fuc)
+	goah := googleoauth.NewHandler(goauc, uh, tuc, ta)
 
 	//app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.Recoverer)
 	app.Router.Use(middleware.URLFormat)
+	app.Router.Use(httprate.Limit(
+		10,
+		2*time.Second,
+		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Too many requests", http.StatusTooManyRequests)
+		}),
+	))
 	app.Router.Use(render.SetContentType(render.ContentTypeJSON))
-	app.Router.Use(lang.SetLanguageContextMiddleware)
+	app.Router.Use(lang.SetLanguageContext)
 
 	app.Router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +98,10 @@ func (app *App) Start() {
 		http.ServeFile(w, r, "public/socket_test.html")
 	})
 
+	workDir, _ := os.Getwd()
+	filesDir := http.Dir(filepath.Join(workDir, "upload/thumbs"))
+	FileServer(app.Router, "/upload", filesDir)
+
 	app.Router.Route("/api", func(r chi.Router) {
 		uh.Routes(r)
 		fh.Routes(r)
@@ -102,31 +118,29 @@ func (app *App) Start() {
 		appPort = "8080"
 	}
 
+	fmt.Println(fmt.Sprintf("Starting server at: %s:%s", appIp, appPort))
+
 	err = http.ListenAndServe(appIp+":"+appPort, app.Router)
 	if err != nil {
 		return
 	}
 }
 
-type ErrResponse struct {
-	Err            error `json:"-"` // low-level runtime error
-	HTTPStatusCode int   `json:"-"` // http response status code
-
-	StatusText string `json:"status"`         // user-level status message
-	AppCode    int64  `json:"code,omitempty"` // application-specific error code
-	ErrorText  string `json:"-"`              // application-level error message, for debugging
-}
-
-func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	render.Status(r, e.HTTPStatusCode)
-	return nil
-}
-
-func ErrInvalidRequest(err error, code int, text string) render.Renderer {
-	return &ErrResponse{
-		Err:            err,
-		HTTPStatusCode: code,
-		StatusText:     text,
-		ErrorText:      err.Error(),
+func FileServer(r chi.Router, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit any URL parameters.")
 	}
+
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
+		rctx := chi.RouteContext(r.Context())
+		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
+		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
+		fs.ServeHTTP(w, r)
+	})
 }

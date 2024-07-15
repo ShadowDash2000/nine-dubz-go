@@ -6,8 +6,7 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Route("/user", func(r chi.Router) {
 		r.Route("/get-short", func(r chi.Router) {
 			r.
-				With(h.TokenAuthorize.IsAuthorizedMiddleware).
-				With(h.PermissionMiddleware).
+				With(h.IsAuthorized).
 				Get("/", h.GetUserShortHandler)
 		})
 
@@ -17,20 +16,21 @@ func (h *Handler) Routes(r chi.Router) {
 
 		r.Route("/update-picture", func(r chi.Router) {
 			r.
-				With(h.TokenAuthorize.IsAuthorizedMiddleware).
-				With(h.PermissionMiddleware).
+				With(h.IsAuthorized).
 				Post("/", h.UpdatePictureHandler)
 		})
 	})
-	r.Route("/authorize/inner", func(r chi.Router) {
-		r.Route("/register", func(r chi.Router) {
-			r.Post("/", h.RegisterHandler)
+	r.
+		With(h.IsNotAuthorized).
+		Route("/authorize/inner", func(r chi.Router) {
+			r.Route("/register", func(r chi.Router) {
+				r.Post("/", h.RegisterHandler)
+			})
+			r.Route("/login", func(r chi.Router) {
+				r.Post("/", h.LoginHandler)
+			})
+			r.Route("/confirm", func(r chi.Router) {
+				r.Get("/", h.ConfirmRegistrationHandler)
+			})
 		})
-		r.Route("/login", func(r chi.Router) {
-			r.Post("/", h.LoginHandler)
-		})
-		r.Route("/confirm", func(r chi.Router) {
-			r.Get("/", h.ConfirmRegistrationHandler)
-		})
-	})
 }

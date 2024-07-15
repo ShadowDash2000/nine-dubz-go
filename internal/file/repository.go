@@ -62,7 +62,7 @@ func (fr *Repository) VerifyFileType(buff []byte, types []string) (bool, string)
 	return isCorrectType, filetype
 }
 
-func (fr *Repository) CopyTmpFile(uploadPath string, tmpFilePath string, header *UploadHeader) (*File, error) {
+func (fr *Repository) CopyTmpFile(uploadPath string, tmpFilePath string, fileName string) (*File, error) {
 	tmpFile, err := os.Open(tmpFilePath)
 	if err != nil {
 		fmt.Println(err)
@@ -77,7 +77,7 @@ func (fr *Repository) CopyTmpFile(uploadPath string, tmpFilePath string, header 
 
 	timeNow := time.Now().UnixNano()
 	newFileName := strconv.Itoa(int(timeNow))
-	extension := filepath.Ext(header.Filename)
+	extension := filepath.Ext(fileName)
 	filePath := uploadPath + "/" + newFileName + extension
 	f, err := os.Create(filePath)
 	if err != nil {
@@ -96,7 +96,7 @@ func (fr *Repository) CopyTmpFile(uploadPath string, tmpFilePath string, header 
 	savedFile, err := fr.Add(&File{
 		Name:         newFileName,
 		Extension:    extension,
-		OriginalName: header.Filename,
+		OriginalName: fileName,
 		Path:         filePath,
 		Size:         size,
 	})
@@ -113,7 +113,7 @@ const (
 	UploadStatusComplete  int = 2
 )
 
-func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, header *UploadHeader, conn *websocket.Conn) (string, error) {
+func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, conn *websocket.Conn) (string, error) {
 	err := os.MkdirAll(tmpPath, os.ModePerm)
 	if err != nil {
 		return "", err
@@ -185,7 +185,7 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, he
 		tmpFile.Write(message)
 
 		bytesRead += len(message)
-		if bytesRead == header.Size {
+		if bytesRead == fileSize {
 			tmpFile.Close()
 			break
 		}

@@ -3,17 +3,18 @@ package tokenauthorize
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/net/context"
 	"net/http"
 	"time"
 )
 
 type TokenAuthorize struct {
+	Issuer    string
 	SecretKey string
 }
 
-func New(secretKey string) *TokenAuthorize {
+func New(secretKey, issuer string) *TokenAuthorize {
 	return &TokenAuthorize{
+		Issuer:    issuer,
 		SecretKey: secretKey,
 	}
 }
@@ -21,7 +22,7 @@ func New(secretKey string) *TokenAuthorize {
 func (ta *TokenAuthorize) CreateToken(subject string) (string, *jwt.RegisteredClaims, error) {
 	claims := &jwt.RegisteredClaims{
 		Subject:   subject,
-		Issuer:    "nine-dubz",
+		Issuer:    ta.Issuer,
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24 * 30)),
 	}
@@ -72,24 +73,4 @@ func (ta *TokenAuthorize) GetTokenCookie(subject string) (*http.Cookie, error) {
 	}
 
 	return &tokenCookie, nil
-}
-
-func (ta *TokenAuthorize) IsAuthorizedMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenCookie, err := r.Cookie("token")
-		if err != nil {
-			http.Error(w, "Token cookie not found", http.StatusUnauthorized)
-			return
-		}
-
-		if _, err = ta.VerifyToken(tokenCookie.Value); err != nil {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, "token", tokenCookie.Value)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
