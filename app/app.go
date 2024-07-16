@@ -62,7 +62,7 @@ func (app *App) Start() {
 	// Http handlers
 	uh := user.NewHandler(uuc, tuc, ta, lang)
 	fh := file.NewHandler(fuc)
-	mh := movie.NewHandler(movuc, uh, fuc)
+	mh := movie.NewHandler(movuc, uh, fuc, ta, tuc)
 	goah := googleoauth.NewHandler(goauc, uh, tuc, ta)
 
 	//app.Router.Use(middleware.Logger)
@@ -101,6 +101,18 @@ func (app *App) Start() {
 	workDir, _ := os.Getwd()
 	filesDir := http.Dir(filepath.Join(workDir, "upload/"))
 	FileServer(app.Router, "/upload", filesDir)
+
+	app.Router.Route("/upload/tmp", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		})
+	})
+
+	app.Router.Route("/upload/video", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+		})
+	})
 
 	app.Router.Route("/api", func(r chi.Router) {
 		uh.Routes(r)

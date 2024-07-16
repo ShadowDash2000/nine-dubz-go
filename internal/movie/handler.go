@@ -8,20 +8,26 @@ import (
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
+	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
+	"nine-dubz/pkg/tokenauthorize"
 )
 
 type Handler struct {
-	MovieUseCase *UseCase
-	UserHandler  *user.Handler
-	FileUseCase  *file.UseCase
+	MovieUseCase   *UseCase
+	UserHandler    *user.Handler
+	FileUseCase    *file.UseCase
+	TokenAuthorize *tokenauthorize.TokenAuthorize
+	TokenUseCase   *token.UseCase
 }
 
-func NewHandler(uc *UseCase, uh *user.Handler, fuc *file.UseCase) *Handler {
+func NewHandler(uc *UseCase, uh *user.Handler, fuc *file.UseCase, ta *tokenauthorize.TokenAuthorize, tuc *token.UseCase) *Handler {
 	return &Handler{
-		MovieUseCase: uc,
-		UserHandler:  uh,
-		FileUseCase:  fuc,
+		MovieUseCase:   uc,
+		UserHandler:    uh,
+		FileUseCase:    fuc,
+		TokenAuthorize: ta,
+		TokenUseCase:   tuc,
 	}
 }
 
@@ -45,12 +51,6 @@ func (h *Handler) AddHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	conn, err := h.FileUseCase.UpgradeConnection(w, r)
 	if err != nil {
 		http.Error(w, "Can't upgrade connection", http.StatusInternalServerError)
@@ -104,8 +104,32 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if header.Token == "" {
+		conn.WriteJSON(&file.UploadStatus{
+			Status: file.UploadStatusError,
+			Error:  "No token",
+		})
+		return
+	}
 
-	if ok := h.MovieUseCase.CheckByUser(userId.(uint), header.MovieCode); !ok {
+	if _, err = h.TokenAuthorize.VerifyToken(header.Token); err != nil {
+		conn.WriteJSON(&file.UploadStatus{
+			Status: file.UploadStatusError,
+			Error:  "Invalid token",
+		})
+		return
+	}
+
+	userId, err := h.TokenUseCase.GetUserIdByToken(header.Token)
+	if err != nil {
+		conn.WriteJSON(&file.UploadStatus{
+			Status: file.UploadStatusError,
+			Error:  "User not found",
+		})
+		return
+	}
+
+	if ok := h.MovieUseCase.CheckByUser(userId, header.MovieCode); !ok {
 		conn.WriteJSON(&file.UploadStatus{
 			Status: file.UploadStatusError,
 			Error:  "Permission denied",
@@ -115,7 +139,7 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 
 	file, err := h.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, header.Filename, conn)
 	if err != nil {
-		h.MovieUseCase.Delete(userId.(uint), header.MovieCode)
+		h.MovieUseCase.Delete(userId, header.MovieCode)
 		return
 	}
 
