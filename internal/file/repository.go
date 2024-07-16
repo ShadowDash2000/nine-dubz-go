@@ -182,6 +182,10 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 			return "", errors.New("invalid file block received")
 		}
 
+		/*
+			TODO add max chunk size
+		*/
+
 		tmpFile.Write(message)
 
 		bytesRead += len(message)

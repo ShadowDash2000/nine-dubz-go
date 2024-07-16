@@ -26,6 +26,7 @@ type VideoUploadHeader struct {
 	Filename  string `json:"filename"`
 	Size      int    `json:"size"`
 	MovieCode string `json:"movieCode"`
+	Token     string `json:"token"`
 }
 
 type AddRequest struct {
