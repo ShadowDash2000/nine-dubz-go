@@ -109,7 +109,7 @@ func (uc *UseCase) Get(movieCode string) (*GetResponse, error) {
 }
 
 func (uc *UseCase) CheckByUser(userId uint, code string) bool {
-	_, err := uc.MovieInteractor.GetWhere(code, map[string]interface{}{"user_id": userId})
+	_, err := uc.MovieInteractor.GetWhere(code, map[string]interface{}{"user_id": userId, "video_id": nil})
 	if err != nil {
 		return false
 	}

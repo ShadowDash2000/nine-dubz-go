@@ -2,6 +2,7 @@ package movie
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/gorilla/websocket"
@@ -10,12 +11,15 @@ import (
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
+	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/tokenauthorize"
+	"os"
 	"strconv"
 )
 
 type Handler struct {
 	MovieUseCase   *UseCase
+	FfmpegThumbs   *ffmpegthumbs.FfmpegThumbs
 	UserHandler    *user.Handler
 	FileUseCase    *file.UseCase
 	TokenAuthorize *tokenauthorize.TokenAuthorize
@@ -25,6 +29,7 @@ type Handler struct {
 func NewHandler(uc *UseCase, uh *user.Handler, fuc *file.UseCase, ta *tokenauthorize.TokenAuthorize, tuc *token.UseCase) *Handler {
 	return &Handler{
 		MovieUseCase:   uc,
+		FfmpegThumbs:   &ffmpegthumbs.FfmpegThumbs{},
 		UserHandler:    uh,
 		FileUseCase:    fuc,
 		TokenAuthorize: ta,
@@ -144,9 +149,20 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	thumbsPath := "upload/thumbs/" + file.Name
+	go func() {
+		err = h.FfmpegThumbs.SplitVideoToThumbnails(file.Path, thumbsPath)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		os.Remove(file.Path)
+	}()
+
 	movieUpdateRequest := &VideoUpdateRequest{
-		Code:  header.MovieCode,
-		Video: file,
+		Code:       header.MovieCode,
+		Video:      file,
+		ThumbsPath: thumbsPath,
 	}
 	h.MovieUseCase.UpdateVideo(movieUpdateRequest)
 }
