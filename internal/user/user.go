@@ -113,7 +113,7 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 		return errors.New("invalid file type")
 	}
 
-	picture, err := uc.FileUseCase.SaveFile("upload/profile_pictures", header.Filename, file)
+	picture, err := uc.FileUseCase.SaveFile("upload/profile_pictures/", header.Filename, file)
 	if err != nil {
 		return err
 	}

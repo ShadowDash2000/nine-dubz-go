@@ -33,6 +33,11 @@ func New(db *gorm.DB) *UseCase {
 
 func (uc *UseCase) UpgradeConnection(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
 	upgrader := websocket.Upgrader{}
+	/**
+	TODO added for testing
+	REMOVE IN FUTURE
+	*/
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	connection, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return nil, err

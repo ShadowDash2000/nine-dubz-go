@@ -42,7 +42,7 @@ func (app *App) Start() {
 	fuc := file.New(app.DB)
 	tuc := token.New(app.DB)
 	ruc := role.New(app.DB)
-	movuc := movie.New(app.DB)
+	movuc := movie.New(app.DB, fuc)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc)
 

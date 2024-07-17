@@ -3,7 +3,10 @@ package movie
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"gorm.io/gorm"
+	"io"
+	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
 	"strings"
 	"time"
@@ -11,13 +14,15 @@ import (
 
 type UseCase struct {
 	MovieInteractor Interactor
+	FileUseCase     *file.UseCase
 }
 
-func New(db *gorm.DB) *UseCase {
+func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
 	return &UseCase{
 		MovieInteractor: &Repository{
 			DB: db,
 		},
+		FileUseCase: fuc,
 	}
 }
 
@@ -55,9 +60,38 @@ func (uc *UseCase) DeleteMultiple(userId uint, movies *[]DeleteRequest) error {
 	return nil
 }
 
-func (uc *UseCase) Update(movie *UpdateRequest) error {
-	movieRequest := NewUpdateRequest(movie)
+func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) error {
+	movieRequest := NewVideoUpdateRequest(movie)
 	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code})
+}
+
+func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
+	movieRequest := NewUpdateRequest(movie)
+
+	if movie.PreviewHeader.Size > 0 {
+		buff := make([]byte, 512)
+		_, err := movie.Preview.Read(buff)
+		if err != nil {
+			return err
+		}
+		_, err = movie.Preview.Seek(0, io.SeekStart)
+		if err != nil {
+			return err
+		}
+		isCorrectType, _ := uc.FileUseCase.VerifyFileType(buff, []string{"image/jpeg", "image/png", "image/webp"})
+		if !isCorrectType {
+			return errors.New("invalid file type")
+		}
+
+		preview, err := uc.FileUseCase.SaveFile("upload/video_previews/", movie.PreviewHeader.Filename, movie.Preview)
+		if err != nil {
+			return err
+		}
+
+		movieRequest.Preview = preview
+	}
+
+	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
 }
 
 func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRequest) error {
