@@ -11,6 +11,7 @@ import (
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/pkg/tokenauthorize"
+	"strconv"
 )
 
 type Handler struct {
@@ -143,21 +144,42 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	movieUpdateRequest := &UpdateRequest{
+	movieUpdateRequest := &VideoUpdateRequest{
 		Code:  header.MovieCode,
 		Video: file,
 	}
-	h.MovieUseCase.Update(movieUpdateRequest)
+	h.MovieUseCase.UpdateVideo(movieUpdateRequest)
 }
 
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
-	movieUpdateRequest := &UpdateRequest{}
-	if err := json.NewDecoder(r.Body).Decode(movieUpdateRequest); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+	userId := r.Context().Value("userId")
+	if userId == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	err := h.MovieUseCase.Update(movieUpdateRequest)
+	if err := r.ParseMultipartForm(6 << 20); err != nil {
+		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+		return
+	}
+
+	movieUpdateRequest := &UpdateRequest{}
+	movieUpdateRequest.Code = chi.URLParam(r, "movieCode")
+	movieUpdateRequest.Name = r.PostForm.Get("name")
+	movieUpdateRequest.Description = r.PostForm.Get("description")
+
+	isPublished, err := strconv.ParseBool(r.PostForm.Get("isPublished"))
+	if err == nil {
+		movieUpdateRequest.IsPublished = isPublished
+	}
+
+	file, fileHeader, err := r.FormFile("preview")
+	if err == nil {
+		movieUpdateRequest.Preview = file
+		movieUpdateRequest.PreviewHeader = fileHeader
+	}
+
+	err = h.MovieUseCase.UpdateByUserId(userId.(uint), movieUpdateRequest)
 	if err != nil {
 		http.Error(w, "Can't update movie", http.StatusBadRequest)
 		return

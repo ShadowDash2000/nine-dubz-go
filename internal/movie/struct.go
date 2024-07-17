@@ -2,6 +2,7 @@ package movie
 
 import (
 	"gorm.io/gorm"
+	"mime/multipart"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
 )
@@ -11,15 +12,14 @@ type Movie struct {
 	ID          uint       `json:"ID"`
 	Code        string     `json:"code"`
 	IsPublished bool       `json:"-" gorm:"default:false"`
-	Poster      string     `json:"poster,omitempty"`
+	Description string     `json:"description"`
+	PreviewId   *uint      `json:"-" gorm:"foreignKey:Pre"`
+	Preview     *file.File `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
 	Name        string     `json:"name"`
-	DubDate     string     `json:"dubDate"`
-	VoiceActors string     `json:"voiceActors"`
-	Genre       string     `json:"genre"`
-	VideoId     *uint      `json:"-" gorm:"foreignKey:VideoId;references:ID;OnUpdate:CASCADE,OnDelete:SET NULL;"`
-	Video       *file.File `json:"video"`
-	UserId      uint       `json:"-" gorm:"foreignKey:UserID;references:ID"`
-	User        user.User  `json:"-"`
+	VideoId     *uint      `json:"-"`
+	Video       *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
+	UserId      uint       `json:"-"`
+	User        user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
 }
 
 type VideoUploadHeader struct {
@@ -50,69 +50,66 @@ func NewAddResponse(movie *Movie) *AddResponse {
 }
 
 type GetResponse struct {
-	Code        string     `json:"code"`
-	Poster      string     `json:"poster"`
-	Name        string     `json:"name"`
-	DubDate     string     `json:"dubDate"`
-	VoiceActors string     `json:"voiceActors"`
-	Genre       string     `json:"genre"`
-	Video       *file.File `json:"video"`
+	Code    string     `json:"code"`
+	Preview *file.File `json:"preview"`
+	Name    string     `json:"name"`
+	Video   *file.File `json:"video"`
 }
 
 func NewGetResponse(movie *Movie) *GetResponse {
 	return &GetResponse{
-		Poster:      movie.Poster,
-		Name:        movie.Name,
-		DubDate:     movie.DubDate,
-		VoiceActors: movie.VoiceActors,
-		Genre:       movie.Genre,
-		Video:       movie.Video,
+		Code:    movie.Code,
+		Preview: movie.Preview,
+		Name:    movie.Name,
+		Video:   movie.Video,
 	}
 }
 
 type GetForUserResponse struct {
 	IsPublished bool       `json:"isPublished"`
 	Code        string     `json:"code"`
-	Poster      string     `json:"poster"`
+	Preview     *file.File `json:"preview"`
 	Name        string     `json:"name"`
-	DubDate     string     `json:"dubDate"`
-	VoiceActors string     `json:"voiceActors"`
-	Genre       string     `json:"genre"`
 	Video       *file.File `json:"video"`
 }
 
 func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 	return &GetForUserResponse{
 		IsPublished: movie.IsPublished,
-		Poster:      movie.Poster,
+		Code:        movie.Code,
+		Preview:     movie.Preview,
 		Name:        movie.Name,
-		DubDate:     movie.DubDate,
-		VoiceActors: movie.VoiceActors,
-		Genre:       movie.Genre,
 		Video:       movie.Video,
 	}
 }
 
+type VideoUpdateRequest struct {
+	Code  string     `json:"code"`
+	Video *file.File `json:"video"`
+}
+
+func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
+	return &Movie{
+		Code:  movie.Code,
+		Video: movie.Video,
+	}
+}
+
 type UpdateRequest struct {
-	Code        string     `json:"code"`
-	IsPublished bool       `json:"isPublished"`
-	Poster      string     `json:"poster"`
-	Name        string     `json:"name"`
-	DubDate     string     `json:"dubDate"`
-	VoiceActors string     `json:"voiceActors"`
-	Genre       string     `json:"genre"`
-	Video       *file.File `json:"video"`
+	Code          string                `json:"code"`
+	IsPublished   bool                  `json:"isPublished"`
+	Description   string                `json:"description"`
+	Preview       multipart.File        `json:"preview,omitempty"`
+	PreviewHeader *multipart.FileHeader `json:"-"`
+	Name          string                `json:"name"`
 }
 
 func NewUpdateRequest(movie *UpdateRequest) *Movie {
 	return &Movie{
 		Code:        movie.Code,
-		Poster:      movie.Poster,
+		IsPublished: movie.IsPublished,
+		Description: movie.Description,
 		Name:        movie.Name,
-		DubDate:     movie.DubDate,
-		VoiceActors: movie.VoiceActors,
-		Genre:       movie.Genre,
-		Video:       movie.Video,
 	}
 }
 
