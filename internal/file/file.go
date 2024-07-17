@@ -1,14 +1,12 @@
 package file
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/s3storage"
 	"os"
 	"strconv"
@@ -18,7 +16,6 @@ import (
 type UseCase struct {
 	FileInteractor Interactor
 	S3Storage      *s3storage.S3Storage
-	FfmpegThumbs   *ffmpegthumbs.FfmpegThumbs
 }
 
 func New(db *gorm.DB) *UseCase {
@@ -26,8 +23,7 @@ func New(db *gorm.DB) *UseCase {
 		FileInteractor: &Repository{
 			DB: db,
 		},
-		S3Storage:    s3storage.NewS3Storage(),
-		FfmpegThumbs: &ffmpegthumbs.FfmpegThumbs{},
+		S3Storage: s3storage.NewS3Storage(),
 	}
 }
 
@@ -105,15 +101,6 @@ func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileNam
 		os.Remove(file.Path)
 		return nil, err
 	}
-
-	go func() {
-		err = uc.FfmpegThumbs.SplitVideoToThumbnails(file.Path, "upload/thumbs/"+file.Name)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		os.Remove(file.Path)
-	}()
 
 	return file, nil
 }
