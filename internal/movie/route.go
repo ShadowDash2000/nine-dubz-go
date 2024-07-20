@@ -17,7 +17,9 @@ func (h *Handler) MovieRoutes(r chi.Router) {
 					With(h.UserHandler.IsAuthorized).
 					With(h.UserHandler.UserPermission).
 					Route("/", func(r chi.Router) {
-						r.Get("/", h.GetMultipleForUserHandler)
+						r.
+							With(pagination.SetPaginationContextMiddleware).
+							Get("/", h.GetMultipleForUserHandler)
 						r.Post("/", h.AddHandler)
 					})
 				r.
