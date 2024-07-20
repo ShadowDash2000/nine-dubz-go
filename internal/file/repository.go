@@ -5,13 +5,8 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
-	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strconv"
-	"time"
 )
 
 type Repository struct {
@@ -49,6 +44,13 @@ func (fr *Repository) Get(id uint) (*File, error) {
 	return file, result.Error
 }
 
+func (fr *Repository) GetWhere(where map[string]interface{}) (*File, error) {
+	file := &File{}
+	result := fr.DB.Where(where).First(&file)
+
+	return file, result.Error
+}
+
 func (fr *Repository) VerifyFileType(buff []byte, types []string) (bool, string) {
 	filetype := http.DetectContentType(buff)
 	isCorrectType := false
@@ -62,67 +64,22 @@ func (fr *Repository) VerifyFileType(buff []byte, types []string) (bool, string)
 	return isCorrectType, filetype
 }
 
-func (fr *Repository) CopyTmpFile(uploadPath string, tmpFilePath string, fileName string) (*File, error) {
-	tmpFile, err := os.Open(tmpFilePath)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer tmpFile.Close()
-
-	err = os.MkdirAll(uploadPath, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-
-	timeNow := time.Now().UnixNano()
-	newFileName := strconv.Itoa(int(timeNow))
-	extension := filepath.Ext(fileName)
-	filePath := uploadPath + "/" + newFileName + extension
-	f, err := os.Create(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	size, err := io.Copy(f, tmpFile)
-	if err != nil {
-		return nil, err
-	}
-
-	tmpFile.Close()
-	os.Remove(tmpFilePath)
-
-	savedFile, err := fr.Add(&File{
-		Name:         newFileName,
-		Extension:    extension,
-		OriginalName: fileName,
-		Path:         filePath,
-		Size:         size,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return savedFile, nil
-}
-
 const (
 	UploadStatusNextChunk int = 0
 	UploadStatusError     int = 1
 	UploadStatusComplete  int = 2
 )
 
-func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, conn *websocket.Conn) (string, error) {
+func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, conn *websocket.Conn) (*os.File, error) {
 	err := os.MkdirAll(tmpPath, os.ModePerm)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	tmpFile, err := os.CreateTemp(tmpPath, "websocket_upload_")
 	if err != nil {
 		fmt.Println("Could not create temp file: " + err.Error())
-		return "", err
+		return nil, err
 	}
 	defer tmpFile.Close()
 
@@ -140,7 +97,7 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 				Status: UploadStatusError,
 				Error:  "failed to receive message: " + err.Error(),
 			})
-			return "", err
+			return nil, err
 		}
 
 		if !isCorrectType {
@@ -150,7 +107,7 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 					Status: UploadStatusError,
 					Error:  "file type not supported",
 				})
-				return "", errors.New("file type not supported")
+				return nil, errors.New("file type not supported")
 			}
 		}
 
@@ -160,7 +117,7 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 				Error:  err.Error(),
 			})
 			fmt.Println("File is too large")
-			return "", errors.New("file is too large")
+			return nil, errors.New("file is too large")
 		}
 
 		if messageType != websocket.BinaryMessage {
@@ -172,14 +129,14 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 					Status: UploadStatusComplete,
 					Error:  "upload canceled",
 				})
-				return "", errors.New("upload canceled")
+				return nil, errors.New("upload canceled")
 			}
 
 			conn.WriteJSON(&UploadStatus{
 				Status: UploadStatusError,
 				Error:  "invalid file block received",
 			})
-			return "", errors.New("invalid file block received")
+			return nil, errors.New("invalid file block received")
 		}
 
 		/*
@@ -192,6 +149,15 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 		if bytesRead == fileSize {
 			tmpFile.Close()
 			break
+		} else if bytesRead > fileSize {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+
+			conn.WriteJSON(&UploadStatus{
+				Status: UploadStatusError,
+				Error:  "read more than allowed file size",
+			})
+			return nil, errors.New("read more than allowed file size")
 		}
 
 		conn.WriteJSON(&UploadStatus{
@@ -203,40 +169,5 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 		Status: UploadStatusComplete,
 	})
 
-	return tmpFile.Name(), nil
-}
-
-func (fr *Repository) SaveFile(path string, fileName string, file multipart.File) (*File, error) {
-	err := os.MkdirAll(path, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-
-	timeNow := time.Now().UnixNano()
-	newFileName := strconv.Itoa(int(timeNow))
-	extension := filepath.Ext(fileName)
-	filePath := path + newFileName + extension
-	f, err := os.Create(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	size, err := io.Copy(f, file)
-	if err != nil {
-		return nil, err
-	}
-
-	savedFile, err := fr.Add(&File{
-		Name:         newFileName,
-		Extension:    extension,
-		OriginalName: fileName,
-		Path:         filePath,
-		Size:         size,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return savedFile, nil
+	return tmpFile, nil
 }

@@ -4,16 +4,24 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
+	"nine-dubz/pkg/ffmpegthumbs"
+	"nine-dubz/pkg/webvtt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
 type UseCase struct {
 	MovieInteractor Interactor
+	FfmpegThumbs    *ffmpegthumbs.FfmpegThumbs
+	WebVtt          *webvtt.WebVTT
 	FileUseCase     *file.UseCase
 }
 
@@ -22,7 +30,9 @@ func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
 		MovieInteractor: &Repository{
 			DB: db,
 		},
-		FileUseCase: fuc,
+		FfmpegThumbs: &ffmpegthumbs.FfmpegThumbs{},
+		WebVtt:       &webvtt.WebVTT{},
+		FileUseCase:  fuc,
 	}
 }
 
@@ -60,6 +70,63 @@ func (uc *UseCase) DeleteMultiple(userId uint, movies *[]DeleteRequest) error {
 	return nil
 }
 
+func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *websocket.Conn) error {
+	videoFile, tmpFile, err := uc.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, header.Filename, conn)
+	if err != nil {
+		uc.Delete(userId, header.MovieCode)
+		return err
+	}
+
+	defer os.Remove(tmpFile.Name())
+
+	thumbsPath := "upload/thumbs/" + videoFile.Name
+	thumbsWebvttPath := "/api/file/"
+	imagesFilePath := make([]string, 0)
+	frameDuration := 10
+
+	err = uc.FfmpegThumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		items, _ := os.ReadDir(thumbsPath)
+		for _, item := range items {
+			if item.IsDir() {
+				continue
+			}
+
+			imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
+			imageFileInfo, _ := imageFile.Stat()
+			savedImageFile, _ := uc.FileUseCase.SaveFile(imageFile, item.Name(), imageFileInfo.Size(), "public")
+			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
+
+			imageFile.Close()
+		}
+	}
+
+	var savedVttFile *file.File
+	if len(imagesFilePath) > 0 {
+		videoDuration, _ := uc.FfmpegThumbs.GetVideoDuration(tmpFile.Name())
+		vttFile, _ := uc.WebVtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
+		vttFile, _ = os.Open(vttFile.Name())
+		savedVttFile, _ = uc.FileUseCase.SaveFile(vttFile, vttFile.Name(), 0, "public")
+		vttFile.Close()
+	}
+
+	os.RemoveAll(thumbsPath)
+
+	movieUpdateRequest := &VideoUpdateRequest{
+		Code:   header.MovieCode,
+		Video:  videoFile,
+		WebVtt: savedVttFile,
+	}
+	err = uc.UpdateVideo(movieUpdateRequest)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) error {
 	movieRequest := NewVideoUpdateRequest(movie)
 	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code})
@@ -68,7 +135,7 @@ func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) error {
 func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	movieRequest := NewUpdateRequest(movie)
 
-	if movie.PreviewHeader.Size > 0 {
+	if movie.PreviewHeader != nil && movie.PreviewHeader.Size > 0 {
 		buff := make([]byte, 512)
 		_, err := movie.Preview.Read(buff)
 		if err != nil {
@@ -83,7 +150,7 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 			return errors.New("invalid file type")
 		}
 
-		preview, err := uc.FileUseCase.SaveFile("upload/video_previews/", movie.PreviewHeader.Filename, movie.Preview)
+		preview, err := uc.FileUseCase.SaveFile(movie.Preview, movie.PreviewHeader.Filename, movie.PreviewHeader.Size, "public")
 		if err != nil {
 			return err
 		}
@@ -106,6 +173,23 @@ func (uc *UseCase) Get(movieCode string) (*GetResponse, error) {
 	}
 
 	return NewGetResponse(movie), nil
+}
+
+func (uc *UseCase) CheckMovieAccess(userId uint, code string) (*GetResponse, error) {
+	movie, err := uc.MovieInteractor.Get(code)
+	if err != nil {
+		return nil, err
+	}
+
+	if movie.IsPublished {
+		return NewGetResponse(movie), nil
+	}
+
+	if movie.UserId == userId {
+		return NewGetResponse(movie), nil
+	}
+
+	return nil, errors.New("not allowed")
 }
 
 func (uc *UseCase) CheckByUser(userId uint, code string) bool {

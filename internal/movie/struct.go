@@ -20,7 +20,8 @@ type Movie struct {
 	Video       *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
 	UserId      uint       `json:"-"`
 	User        user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
-	ThumbsPath  string     `json:"thumbsPath"`
+	WebVttId    *uint      `json:"-"`
+	WebVtt      *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 }
 
 type VideoUploadHeader struct {
@@ -51,20 +52,20 @@ func NewAddResponse(movie *Movie) *AddResponse {
 }
 
 type GetResponse struct {
-	Code       string     `json:"code"`
-	Preview    *file.File `json:"preview"`
-	Name       string     `json:"name"`
-	Video      *file.File `json:"video"`
-	ThumbsPath string     `json:"thumbsPath"`
+	Code    string     `json:"code"`
+	Preview *file.File `json:"preview"`
+	Name    string     `json:"name"`
+	Video   *file.File `json:"video"`
+	WebVtt  *file.File `json:"webVtt"`
 }
 
 func NewGetResponse(movie *Movie) *GetResponse {
 	return &GetResponse{
-		Code:       movie.Code,
-		Preview:    movie.Preview,
-		Name:       movie.Name,
-		Video:      movie.Video,
-		ThumbsPath: movie.ThumbsPath,
+		Code:    movie.Code,
+		Preview: movie.Preview,
+		Name:    movie.Name,
+		Video:   movie.Video,
+		WebVtt:  movie.WebVtt,
 	}
 }
 
@@ -87,16 +88,16 @@ func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 }
 
 type VideoUpdateRequest struct {
-	Code       string     `json:"code"`
-	Video      *file.File `json:"video"`
-	ThumbsPath string     `json:"thumbsPath"`
+	Code   string     `json:"code"`
+	Video  *file.File `json:"video"`
+	WebVtt *file.File `json:"webVtt"`
 }
 
 func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 	return &Movie{
-		Code:       movie.Code,
-		Video:      movie.Video,
-		ThumbsPath: movie.ThumbsPath,
+		Code:   movie.Code,
+		Video:  movie.Video,
+		WebVtt: movie.WebVtt,
 	}
 }
 
