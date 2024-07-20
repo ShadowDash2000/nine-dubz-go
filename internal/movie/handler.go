@@ -218,11 +218,17 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 
 	moviesResponse, err := h.MovieUseCase.GetMultiple(pagination)
 	if err != nil {
-		http.Error(w, "Movies not found", http.StatusNotFound)
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
 		return
 	}
 
-	render.JSON(w, r, moviesResponse)
+	if len(moviesResponse) > 0 {
+		render.JSON(w, r, moviesResponse)
+	} else {
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
+	}
 }
 
 func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
