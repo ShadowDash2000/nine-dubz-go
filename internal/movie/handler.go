@@ -206,11 +206,17 @@ func (h *Handler) GetMultipleForUserHandler(w http.ResponseWriter, r *http.Reque
 
 	moviesResponse, err := h.MovieUseCase.GetMultipleByUserId(userId.(uint), pagination)
 	if err != nil {
-		http.Error(w, "Movies not found", http.StatusNotFound)
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
 		return
 	}
 
-	render.JSON(w, r, moviesResponse)
+	if len(moviesResponse) > 0 {
+		render.JSON(w, r, moviesResponse)
+	} else {
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
+	}
 }
 
 func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
