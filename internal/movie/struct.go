@@ -9,19 +9,21 @@ import (
 
 type Movie struct {
 	*gorm.Model
-	ID          uint       `json:"ID"`
-	Code        string     `json:"code"`
-	IsPublished bool       `json:"-" gorm:"default:false"`
-	Description string     `json:"description"`
-	PreviewId   *uint      `json:"-" gorm:"foreignKey:Pre"`
-	Preview     *file.File `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
-	Name        string     `json:"name"`
-	VideoId     *uint      `json:"-"`
-	Video       *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
-	UserId      uint       `json:"-"`
-	User        user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
-	WebVttId    *uint      `json:"-"`
-	WebVtt      *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
+	ID               uint       `json:"ID"`
+	Code             string     `json:"code"`
+	IsPublished      bool       `json:"-" gorm:"default:false"`
+	Description      string     `json:"description"`
+	PreviewId        *uint      `json:"-"`
+	Preview          *file.File `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
+	DefaultPreviewId *uint      `json:"-"`
+	DefaultPreview   *file.File `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
+	Name             string     `json:"name"`
+	VideoId          *uint      `json:"-"`
+	Video            *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
+	UserId           uint       `json:"-"`
+	User             user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
+	WebVttId         *uint      `json:"-"`
+	WebVtt           *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 }
 
 type VideoUploadHeader struct {
@@ -52,52 +54,58 @@ func NewAddResponse(movie *Movie) *AddResponse {
 }
 
 type GetResponse struct {
-	Code    string     `json:"code"`
-	Preview *file.File `json:"preview"`
-	Name    string     `json:"name"`
-	Video   *file.File `json:"video"`
-	WebVtt  *file.File `json:"webVtt"`
+	Code           string     `json:"code"`
+	Preview        *file.File `json:"preview"`
+	DefaultPreview *file.File `json:"defaultPreview"`
+	Name           string     `json:"name"`
+	Video          *file.File `json:"video"`
+	WebVtt         *file.File `json:"webVtt"`
 }
 
 func NewGetResponse(movie *Movie) *GetResponse {
 	return &GetResponse{
-		Code:    movie.Code,
-		Preview: movie.Preview,
-		Name:    movie.Name,
-		Video:   movie.Video,
-		WebVtt:  movie.WebVtt,
+		Code:           movie.Code,
+		Preview:        movie.Preview,
+		DefaultPreview: movie.DefaultPreview,
+		Name:           movie.Name,
+		Video:          movie.Video,
+		WebVtt:         movie.WebVtt,
 	}
 }
 
 type GetForUserResponse struct {
-	IsPublished bool       `json:"isPublished"`
-	Code        string     `json:"code"`
-	Preview     *file.File `json:"preview"`
-	Name        string     `json:"name"`
-	Video       *file.File `json:"video"`
+	IsPublished    bool       `json:"isPublished"`
+	Code           string     `json:"code"`
+	Preview        *file.File `json:"preview"`
+	DefaultPreview *file.File `json:"defaultPreview"`
+	Name           string     `json:"name"`
+	Video          *file.File `json:"video"`
 }
 
 func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 	return &GetForUserResponse{
-		IsPublished: movie.IsPublished,
-		Code:        movie.Code,
-		Preview:     movie.Preview,
-		Name:        movie.Name,
-		Video:       movie.Video,
+		IsPublished:    movie.IsPublished,
+		Code:           movie.Code,
+		Preview:        movie.Preview,
+		DefaultPreview: movie.DefaultPreview,
+		Name:           movie.Name,
+		Video:          movie.Video,
 	}
 }
 
 type VideoUpdateRequest struct {
-	Code   string     `json:"code"`
-	Video  *file.File `json:"video"`
-	WebVtt *file.File `json:"webVtt"`
+	Code           string     `json:"code"`
+	Video          *file.File `json:"video"`
+	DefaultPreview *file.File `json:"defaultPreview"`
+	WebVtt         *file.File `json:"webVtt"`
 }
 
 func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 	return &Movie{
-		Code:   movie.Code,
-		Video:  movie.Video,
-		WebVtt: movie.WebVtt,
+		Code:           movie.Code,
+		Video:          movie.Video,
+		DefaultPreview: movie.DefaultPreview,
+		WebVtt:         movie.WebVtt,
 	}
 }
 
