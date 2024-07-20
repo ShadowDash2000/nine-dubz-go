@@ -85,11 +85,13 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 	frameDuration := 10
 
 	err = uc.FfmpegThumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
+	var defaultPreview *file.File
 	if err != nil {
 		fmt.Println(err)
 	} else {
 		items, _ := os.ReadDir(thumbsPath)
-		for _, item := range items {
+		defaultPreviewPos := len(items) / 2
+		for i, item := range items {
 			if item.IsDir() {
 				continue
 			}
@@ -98,6 +100,10 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 			imageFileInfo, _ := imageFile.Stat()
 			savedImageFile, _ := uc.FileUseCase.SaveFile(imageFile, item.Name(), imageFileInfo.Size(), "public")
 			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
+
+			if defaultPreviewPos == i+1 {
+				defaultPreview = savedImageFile
+			}
 
 			imageFile.Close()
 		}
@@ -115,9 +121,10 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 	os.RemoveAll(thumbsPath)
 
 	movieUpdateRequest := &VideoUpdateRequest{
-		Code:   header.MovieCode,
-		Video:  videoFile,
-		WebVtt: savedVttFile,
+		Code:           header.MovieCode,
+		Video:          videoFile,
+		DefaultPreview: defaultPreview,
+		WebVtt:         savedVttFile,
 	}
 	err = uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {

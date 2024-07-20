@@ -44,6 +44,7 @@ func (mr *Repository) Get(code string) (*Movie, error) {
 	result := mr.DB.
 		Preload("Video").
 		Preload("Preview").
+		Preload("DefaultPreview").
 		Preload("WebVtt").
 		First(&movie, "code = ?", code)
 
@@ -55,6 +56,7 @@ func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movi
 	result := mr.DB.
 		Preload("Video").
 		Preload("Preview").
+		Preload("DefaultPreview").
 		Preload("WebVtt").
 		Where(where).
 		First(&movie, "code = ?", code)
@@ -67,6 +69,7 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 	result := mr.DB.
 		Preload("Video").
 		Preload("Preview").
+		Preload("DefaultPreview").
 		Preload("WebVtt").
 		Where("user_id = ?", userId).
 		Limit(pagination.Limit).
@@ -81,6 +84,7 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination) (*[]Movie, 
 	result := mr.DB.
 		Preload("Video").
 		Preload("Preview").
+		Preload("DefaultPreview").
 		Preload("WebVtt").
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
