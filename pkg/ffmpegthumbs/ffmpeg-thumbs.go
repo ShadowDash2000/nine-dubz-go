@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type FfmpegThumbs struct{}
@@ -22,53 +21,24 @@ type Stream struct {
 	RFrameRate string `json:"r_frame_rate"`
 }
 
-func (vr *FfmpegThumbs) SplitVideoToThumbnails(filePath string, outputPath string) error {
+func (vr *FfmpegThumbs) SplitVideoToThumbnails(filePath, outputPath string, frameDuration int) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	probe := &Probe{}
-	fileInfoJson, err := ffmpeg.Probe(filePath)
+	duration, err := vr.GetVideoDuration(filePath)
 	if err != nil {
 		return err
 	}
-
-	err = json.Unmarshal([]byte(fileInfoJson), &probe)
-	if err != nil {
-		return err
-	}
-
-	duration, err := strconv.Atoi(strings.Split(probe.Streams[0].Duration, ".")[0])
-	if err != nil {
-		return err
-	}
-
-	file, err := os.Create(outputPath + "/thumbs.vtt")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	file.Write([]byte("WEBVTT\n\n"))
 
 	i := 0
-	for second := 1; second < duration; second = second + 10 {
-		frameStart := time.Time{}
-		frameStart = frameStart.Add(time.Duration(second) * time.Second)
-		frameEnd := time.Time{}
-		frameEnd = frameEnd.Add(time.Duration(second+10) * time.Second)
-		timeFormat := "15:04:05.000"
-
-		timeString := frameStart.Format(timeFormat) + " --> " + frameEnd.Format(timeFormat)
-		imagePath := fmt.Sprintf("%s/img%d.jpg", outputPath, i)
-
-		file.Write([]byte(timeString + "\n"))
-		file.Write([]byte("/" + imagePath + "\n\n"))
+	for second := 1; second < duration; second = second + frameDuration {
+		imagePath := fmt.Sprintf("%s/img%06d.jpg", outputPath, i)
 
 		ffmpeg.
 			Input(filePath, ffmpeg.KwArgs{"ss": second}).
-			Output(imagePath, ffmpeg.KwArgs{"vframes": "1", "q:v": "10"}).
+			Output(imagePath, ffmpeg.KwArgs{"vframes": "1", "q:v": frameDuration}).
 			Silent(true).
 			Run()
 
@@ -76,6 +46,26 @@ func (vr *FfmpegThumbs) SplitVideoToThumbnails(filePath string, outputPath strin
 	}
 
 	return nil
+}
+
+func (vr *FfmpegThumbs) GetVideoDuration(filePath string) (int, error) {
+	probe := &Probe{}
+	fileInfoJson, err := ffmpeg.Probe(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	err = json.Unmarshal([]byte(fileInfoJson), &probe)
+	if err != nil {
+		return 0, err
+	}
+
+	duration, err := strconv.Atoi(strings.Split(probe.Streams[0].Duration, ".")[0])
+	if err != nil {
+		return 0, err
+	}
+
+	return duration, nil
 }
 
 func (vr *FfmpegThumbs) Resize(filePath string, outputPath string, fileName string) error {

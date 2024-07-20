@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"io"
 	"os"
 )
 
@@ -57,7 +58,7 @@ func (sr *S3Storage) GetS3Client() *s3.Client {
 	return client
 }
 
-func (sr *S3Storage) PutObject(file *os.File, key string) (*s3.PutObjectOutput, error) {
+func (sr *S3Storage) PutObject(file io.Reader, key string) (*s3.PutObjectOutput, error) {
 	client := sr.GetS3Client()
 
 	output, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
@@ -73,13 +74,41 @@ func (sr *S3Storage) PutObject(file *os.File, key string) (*s3.PutObjectOutput, 
 	return output, nil
 }
 
-func (sr *S3Storage) GetObject(key string, fileRange string) (*s3.GetObjectOutput, error) {
+func (sr *S3Storage) GetRangeObject(key string, fileRange string) (*s3.GetObjectOutput, error) {
 	client := sr.GetS3Client()
 
 	object, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(sr.Bucket),
 		Key:    aws.String(key),
 		Range:  aws.String(fileRange),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (sr *S3Storage) GetObject(key string) (*s3.GetObjectOutput, error) {
+	client := sr.GetS3Client()
+
+	object, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(sr.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (sr *S3Storage) DeleteObject(key string) (*s3.DeleteObjectOutput, error) {
+	client := sr.GetS3Client()
+
+	object, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(sr.Bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		return nil, err

@@ -5,12 +5,13 @@ import (
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"nine-dubz/pkg/s3storage"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type UseCase struct {
@@ -55,7 +56,7 @@ func (uc *UseCase) StreamFile(fileName, requestRange string) ([]byte, string, st
 	buff := make([]byte, 1024*1024*5)
 
 	contentRange := strconv.Itoa(off) + "-" + strconv.Itoa(len(buff)+off)
-	output, err := uc.S3Storage.GetObject(fileName, "bytes="+contentRange)
+	output, err := uc.S3Storage.GetRangeObject(fileName, "bytes="+contentRange)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -68,39 +69,91 @@ func (uc *UseCase) StreamFile(fileName, requestRange string) ([]byte, string, st
 	return buff, contentRange, contentLength, nil
 }
 
-func (uc *UseCase) SaveFile(path string, fileName string, file multipart.File) (*File, error) {
-	return uc.FileInteractor.SaveFile(path, fileName, file)
+func (uc *UseCase) GetFile(fileName string) ([]byte, error) {
+	_, err := uc.FileInteractor.GetWhere(map[string]interface{}{
+		"name": fileName,
+		"type": "public",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := uc.S3Storage.GetObject(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	buff, err := io.ReadAll(output.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return buff, nil
+}
+
+func (uc *UseCase) SaveFile(file io.Reader, fileName string, fileSize int64, fileType string) (*File, error) {
+	timeNow := time.Now().UnixNano()
+	newFileName := strconv.Itoa(int(timeNow))
+	extension := filepath.Ext(fileName)
+
+	_, err := uc.S3Storage.PutObject(file, newFileName)
+	if err != nil {
+		return nil, err
+	}
+
+	savedFile, err := uc.FileInteractor.Add(&File{
+		Name:         newFileName,
+		Extension:    extension,
+		OriginalName: fileName,
+		Size:         fileSize,
+		Type:         fileType,
+	})
+	if err != nil {
+		uc.S3Storage.DeleteObject(newFileName)
+		return nil, err
+	}
+
+	return savedFile, nil
 }
 
 func (uc *UseCase) VerifyFileType(buff []byte, types []string) (bool, string) {
 	return uc.FileInteractor.VerifyFileType(buff, types)
 }
 
-func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*File, error) {
+func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*File, *os.File, error) {
 	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, conn)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conn.Close()
 
-	file, err := uc.FileInteractor.CopyTmpFile("upload/video", tmpFile, fileName)
+	timeNow := time.Now().UnixNano()
+	newFileName := strconv.Itoa(int(timeNow))
+	extension := filepath.Ext(fileName)
+
+	tmpFile, _ = os.Open(tmpFile.Name())
+	defer tmpFile.Close()
+
+	_, err = uc.S3Storage.PutObject(tmpFile, newFileName)
 	if err != nil {
-		return nil, err
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, nil, err
 	}
 
-	fileReader, err := os.Open(file.Path)
+	savedFile, err := uc.FileInteractor.Add(&File{
+		Name:         newFileName,
+		Extension:    extension,
+		OriginalName: fileName,
+		Size:         int64(fileSize),
+		Type:         "private",
+	})
 	if err != nil {
-		return nil, err
-	}
-	defer fileReader.Close()
-
-	_, err = uc.S3Storage.PutObject(fileReader, file.Name)
-	if err != nil {
-		uc.FileInteractor.Remove(file.ID)
-		os.Remove(file.Path)
-		return nil, err
+		os.Remove(tmpFile.Name())
+		uc.S3Storage.DeleteObject(newFileName)
+		return nil, nil, err
 	}
 
-	return file, nil
+	return savedFile, tmpFile, nil
 }

@@ -11,15 +11,12 @@ import (
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
-	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/tokenauthorize"
-	"os"
 	"strconv"
 )
 
 type Handler struct {
 	MovieUseCase   *UseCase
-	FfmpegThumbs   *ffmpegthumbs.FfmpegThumbs
 	UserHandler    *user.Handler
 	FileUseCase    *file.UseCase
 	TokenAuthorize *tokenauthorize.TokenAuthorize
@@ -29,7 +26,6 @@ type Handler struct {
 func NewHandler(uc *UseCase, uh *user.Handler, fuc *file.UseCase, ta *tokenauthorize.TokenAuthorize, tuc *token.UseCase) *Handler {
 	return &Handler{
 		MovieUseCase:   uc,
-		FfmpegThumbs:   &ffmpegthumbs.FfmpegThumbs{},
 		UserHandler:    uh,
 		FileUseCase:    fuc,
 		TokenAuthorize: ta,
@@ -143,28 +139,10 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, err := h.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, header.Filename, conn)
+	err = h.MovieUseCase.SaveVideo(userId, header, conn)
 	if err != nil {
-		h.MovieUseCase.Delete(userId, header.MovieCode)
-		return
+		fmt.Println(err)
 	}
-
-	thumbsPath := "upload/thumbs/" + file.Name
-	go func() {
-		err = h.FfmpegThumbs.SplitVideoToThumbnails(file.Path, thumbsPath)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		os.Remove(file.Path)
-	}()
-
-	movieUpdateRequest := &VideoUpdateRequest{
-		Code:       header.MovieCode,
-		Video:      file,
-		ThumbsPath: thumbsPath,
-	}
-	h.MovieUseCase.UpdateVideo(movieUpdateRequest)
 }
 
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
@@ -296,4 +274,34 @@ func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Movie not found", http.StatusNotFound)
 		return
 	}
+}
+
+func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
+	movieCode := chi.URLParam(r, "movieCode")
+	requestRange := r.Header.Get("Range")
+	userId := r.Context().Value("userId")
+	if userId == nil {
+		userId = uint(0)
+	}
+
+	movie, err := h.MovieUseCase.CheckMovieAccess(userId.(uint), movieCode)
+	if err != nil {
+		http.Error(w, "Movie not found", http.StatusNotFound)
+		return
+	}
+
+	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(movie.Video.Name, requestRange)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Accept-Ranges", "bytes")
+	if len(requestRange) > 0 {
+		w.Header().Set("Content-Range", contentRange)
+		w.Header().Set("Content-Length", contentLength)
+	}
+	//w.Header().Set("Content-Type", "video/mp4")
+	w.WriteHeader(http.StatusPartialContent)
+	w.Write(buff)
 }

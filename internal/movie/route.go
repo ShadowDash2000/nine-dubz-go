@@ -45,5 +45,10 @@ func (h *Handler) MovieRoutes(r chi.Router) {
 		r.Route("/{movieCode}", func(r chi.Router) {
 			r.Get("/", h.GetHandler)
 		})
+		r.Route("/stream/{movieCode}", func(r chi.Router) {
+			r.
+				With(h.UserHandler.TryToGetUSerId).
+				Get("/", h.StreamFile)
+		})
 	})
 }
