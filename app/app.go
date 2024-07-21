@@ -63,7 +63,7 @@ func (app *App) Start() {
 	app.Router.Use(middleware.Recoverer)
 	app.Router.Use(middleware.URLFormat)
 	app.Router.Use(httprate.Limit(
-		10,
+		30,
 		2*time.Second,
 		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Too many requests", http.StatusTooManyRequests)
