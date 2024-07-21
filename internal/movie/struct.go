@@ -5,11 +5,13 @@ import (
 	"mime/multipart"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
+	"time"
 )
 
 type Movie struct {
 	*gorm.Model
 	ID               uint       `json:"ID"`
+	CreatedAt        time.Time  `json:"createdAt"`
 	Code             string     `json:"code"`
 	IsPublished      bool       `json:"-" gorm:"default:false"`
 	Description      string     `json:"description"`
@@ -55,6 +57,8 @@ func NewAddResponse(movie *Movie) *AddResponse {
 
 type GetResponse struct {
 	Code           string     `json:"code"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	Description    string     `json:"description"`
 	Preview        *file.File `json:"preview"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	Name           string     `json:"name"`
@@ -65,6 +69,8 @@ type GetResponse struct {
 func NewGetResponse(movie *Movie) *GetResponse {
 	return &GetResponse{
 		Code:           movie.Code,
+		CreatedAt:      movie.CreatedAt,
+		Description:    movie.Description,
 		Preview:        movie.Preview,
 		DefaultPreview: movie.DefaultPreview,
 		Name:           movie.Name,
@@ -76,6 +82,7 @@ func NewGetResponse(movie *Movie) *GetResponse {
 type GetForUserResponse struct {
 	IsPublished    bool       `json:"isPublished"`
 	Code           string     `json:"code"`
+	CreatedAt      time.Time  `json:"createdAt"`
 	Preview        *file.File `json:"preview"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	Name           string     `json:"name"`
