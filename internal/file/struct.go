@@ -9,7 +9,7 @@ type File struct {
 	Extension    string `json:"extension" gorm:"not null"`
 	OriginalName string `json:"originalName" gorm:"not null"`
 	Size         int64  `json:"size" gorm:"not null"`
-	Type         string `json:"type" gorm:"not null"`
+	Type         string `json:"-" gorm:"not null"`
 }
 
 type UploadStatus struct {
