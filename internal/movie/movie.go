@@ -79,6 +79,15 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 
 	defer os.Remove(tmpFile.Name())
 
+	movieUpdateRequest := &VideoUpdateRequest{
+		Code:  header.MovieCode,
+		Video: videoFile,
+	}
+	err = uc.UpdateVideo(movieUpdateRequest)
+	if err != nil {
+		return err
+	}
+
 	thumbsPath := "upload/thumbs/" + videoFile.Name
 	thumbsWebvttPath := "/api/file/"
 	imagesFilePath := make([]string, 0)
@@ -120,10 +129,8 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 
 	os.RemoveAll(thumbsPath)
 
-	movieUpdateRequest := &VideoUpdateRequest{
-		Name:           videoFile.OriginalName,
+	movieUpdateRequest = &VideoUpdateRequest{
 		Code:           header.MovieCode,
-		Video:          videoFile,
 		DefaultPreview: defaultPreview,
 		WebVtt:         savedVttFile,
 	}

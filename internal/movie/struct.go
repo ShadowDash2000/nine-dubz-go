@@ -83,6 +83,7 @@ type GetForUserResponse struct {
 	IsPublished    bool       `json:"isPublished"`
 	Code           string     `json:"code"`
 	CreatedAt      time.Time  `json:"createdAt"`
+	Description    string     `json:"description"`
 	Preview        *file.File `json:"preview"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	Name           string     `json:"name"`
@@ -93,6 +94,8 @@ func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 	return &GetForUserResponse{
 		IsPublished:    movie.IsPublished,
 		Code:           movie.Code,
+		CreatedAt:      movie.CreatedAt,
+		Description:    movie.Description,
 		Preview:        movie.Preview,
 		DefaultPreview: movie.DefaultPreview,
 		Name:           movie.Name,
