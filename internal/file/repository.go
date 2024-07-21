@@ -70,7 +70,7 @@ const (
 	UploadStatusComplete  int = 2
 )
 
-func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, conn *websocket.Conn) (*os.File, error) {
+func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, maxChunkSize int, conn *websocket.Conn) (*os.File, error) {
 	err := os.MkdirAll(tmpPath, os.ModePerm)
 	if err != nil {
 		return nil, err
@@ -139,9 +139,16 @@ func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fi
 			return nil, errors.New("invalid file block received")
 		}
 
-		/*
-			TODO add max chunk size
-		*/
+		if len(message) > maxChunkSize {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+
+			conn.WriteJSON(&UploadStatus{
+				Status: UploadStatusError,
+				Error:  "chunk too large",
+			})
+			return nil, errors.New("chunk too large")
+		}
 
 		tmpFile.Write(message)
 

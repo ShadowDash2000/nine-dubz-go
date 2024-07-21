@@ -46,12 +46,6 @@ func (app *App) Start() {
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc)
 
-	// Language translations
-	lang, err := language.New("lang")
-	if err != nil {
-		log.Println(err)
-	}
-
 	// JWT Token
 	tokenSecretKey, ok := os.LookupEnv("TOKEN_SECRET_KEY")
 	if !ok {
@@ -60,7 +54,7 @@ func (app *App) Start() {
 	ta := tokenauthorize.New(tokenSecretKey, "nine-dubz")
 
 	// Http handlers
-	uh := user.NewHandler(uuc, tuc, ta, lang)
+	uh := user.NewHandler(uuc, tuc, ta)
 	fh := file.NewHandler(fuc)
 	mh := movie.NewHandler(movuc, uh, fuc, ta, tuc)
 	goah := googleoauth.NewHandler(goauc, uh, tuc, ta)
@@ -76,7 +70,7 @@ func (app *App) Start() {
 		}),
 	))
 	app.Router.Use(render.SetContentType(render.ContentTypeJSON))
-	app.Router.Use(lang.SetLanguageContext)
+	app.Router.Use(language.SetLanguageContext)
 
 	app.Router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +79,7 @@ func (app *App) Start() {
 			*/
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, HEAD")
 
 			next.ServeHTTP(w, r)
 		})
@@ -132,7 +126,7 @@ func (app *App) Start() {
 
 	fmt.Println(fmt.Sprintf("Starting server at: %s:%s", appIp, appPort))
 
-	err = http.ListenAndServe(appIp+":"+appPort, app.Router)
+	err := http.ListenAndServe(appIp+":"+appPort, app.Router)
 	if err != nil {
 		return
 	}

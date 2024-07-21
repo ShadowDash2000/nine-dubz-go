@@ -3,7 +3,6 @@ package helper
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"regexp"
 )
 
@@ -31,21 +30,12 @@ func ValidatePassword(password string) bool {
 	return true
 }
 
-func ValidateRegistrationFields(name, email, password string) error {
-	if !ValidateUserName(name) {
-		return errors.New("incorrect user name")
-	}
-	if !ValidateEmail(email) {
-		return errors.New("incorrect email")
-	}
-	if !ValidatePassword(password) {
-		return errors.New("incorrect password")
-	}
-
-	return nil
-}
-
 func HashPassword(password string) string {
 	hash := md5.Sum([]byte(password))
+	return hex.EncodeToString(hash[:])
+}
+
+func Hash(toHash []byte) string {
+	hash := md5.Sum(toHash)
 	return hex.EncodeToString(hash[:])
 }

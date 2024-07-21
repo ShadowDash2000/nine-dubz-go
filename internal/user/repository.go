@@ -1,11 +1,8 @@
 package user
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"gorm.io/gorm"
 	"nine-dubz/internal/role"
-	"time"
 )
 
 type Repository struct {
@@ -19,9 +16,6 @@ func (r *Repository) Add(user *User) uint {
 		return 0
 	}
 	user.Roles = []role.Role{*roleStruct}
-
-	hash := md5.Sum([]byte(user.Name + user.Email + user.Password + time.Now().String()))
-	user.Hash = hex.EncodeToString(hash[:])
 
 	result = r.DB.Create(&user)
 	if result.Error != nil {

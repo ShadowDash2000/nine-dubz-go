@@ -121,6 +121,7 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 	os.RemoveAll(thumbsPath)
 
 	movieUpdateRequest := &VideoUpdateRequest{
+		Name:           videoFile.OriginalName,
 		Code:           header.MovieCode,
 		Video:          videoFile,
 		DefaultPreview: defaultPreview,
@@ -186,6 +187,10 @@ func (uc *UseCase) CheckMovieAccess(userId uint, code string) (*GetResponse, err
 	movie, err := uc.MovieInteractor.Get(code)
 	if err != nil {
 		return nil, err
+	}
+
+	if movie.Video == nil {
+		return nil, errors.New("no video")
 	}
 
 	if movie.IsPublished {

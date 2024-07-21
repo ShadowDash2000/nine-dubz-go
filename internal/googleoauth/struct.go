@@ -1,6 +1,14 @@
 package googleoauth
 
-import "nine-dubz/internal/user"
+import (
+	"gorm.io/gorm"
+	"nine-dubz/internal/user"
+)
+
+type AuthorizeState struct {
+	*gorm.Model
+	State string `json:"-"`
+}
 
 type GoogleUserInfo struct {
 	Id            string `json:"id"`

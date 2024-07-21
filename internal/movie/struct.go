@@ -94,6 +94,7 @@ func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 }
 
 type VideoUpdateRequest struct {
+	Name           string     `json:"name"`
 	Code           string     `json:"code"`
 	Video          *file.File `json:"video"`
 	DefaultPreview *file.File `json:"defaultPreview"`
@@ -102,6 +103,7 @@ type VideoUpdateRequest struct {
 
 func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 	return &Movie{
+		Name:           movie.Name,
 		Code:           movie.Code,
 		Video:          movie.Video,
 		DefaultPreview: movie.DefaultPreview,

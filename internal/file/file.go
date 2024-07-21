@@ -121,7 +121,7 @@ func (uc *UseCase) VerifyFileType(buff []byte, types []string) (bool, string) {
 }
 
 func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*File, *os.File, error) {
-	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, conn)
+	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, 1024*1024, conn)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -11,6 +11,7 @@ import (
 	"nine-dubz/internal/mail"
 	"nine-dubz/internal/role"
 	"nine-dubz/internal/token"
+	"time"
 )
 
 type UseCase struct {
@@ -36,6 +37,8 @@ func New(db *gorm.DB, tuc *token.UseCase, ruc *role.UseCase, fuc *file.UseCase, 
 }
 
 func (uc *UseCase) Add(user *User) uint {
+	user.Hash = helper.Hash([]byte(user.Name + user.Email + user.Password + time.Now().String()))
+
 	return uc.UserInteractor.Add(user)
 }
 
@@ -48,13 +51,25 @@ func (uc *UseCase) LoginWOPassword(user *User) uint {
 	return uc.UserInteractor.LoginWOPassword(user)
 }
 
-func (uc *UseCase) Register(user *User) uint {
-	if err := helper.ValidateRegistrationFields(user.Name, user.Email, user.Password); err != nil {
-		return 0
+func (uc *UseCase) Register(user *User) (uint, error) {
+	if ok := helper.ValidateUserName(user.Name); !ok {
+		return 0, errors.New("REGISTRATION_INVALID_USER_NAME")
+	}
+	if ok := helper.ValidateEmail(user.Email); !ok {
+		return 0, errors.New("REGISTRATION_INVALID_EMAIL")
+	}
+	if ok := helper.ValidatePassword(user.Password); !ok {
+		return 0, errors.New("REGISTRATION_INVALID_PASSWORD")
 	}
 
+	user.Hash = helper.Hash([]byte(user.Name + user.Email + user.Password + time.Now().String()))
 	user.Password = helper.HashPassword(user.Password)
-	return uc.UserInteractor.Add(user)
+	userId := uc.UserInteractor.Add(user)
+	if userId > 0 {
+		return userId, nil
+	} else {
+		return 0, errors.New("REGISTRATION_ALREADY_EXIST")
+	}
 }
 
 func (uc *UseCase) CheckUserWithNameExists(userName string) bool {
@@ -71,10 +86,6 @@ func (uc *UseCase) SendRegistrationEmail(to, subject, content string) error {
 	return uc.MailUseCase.SendMail(to, subject, content)
 }
 
-/*
-*
-TODO update hash after confirmation
-*/
 func (uc *UseCase) ConfirmRegistration(email, hash string) (uint, bool) {
 	user := &User{}
 	err := uc.UserInteractor.GetWhere(user, map[string]interface{}{"active": false, "email": email, "hash": hash})
@@ -85,6 +96,7 @@ func (uc *UseCase) ConfirmRegistration(email, hash string) (uint, bool) {
 	user = &User{
 		ID:     user.ID,
 		Active: true,
+		Hash:   helper.Hash([]byte(user.Name + user.Email + user.Password + time.Now().String())),
 	}
 	err = uc.UserInteractor.Updates(user)
 	if err != nil {

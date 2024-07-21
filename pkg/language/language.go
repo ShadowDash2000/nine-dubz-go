@@ -7,17 +7,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 )
 
-type Repository struct {
-	Languages []Language
-}
-
 type Language struct {
-	Code    string    `json:"code"`
-	Strings []Message `json:"strings"`
+	Code     string    `json:"code"`
+	Messages []Message `json:"messages"`
 }
 
 type Message struct {
@@ -25,61 +22,76 @@ type Message struct {
 	Text string `json:"text"`
 }
 
-func New(languagePath string) (*Repository, error) {
+func GetLanguage(languageCode string) (*Language, error) {
+	languagePath := GetPath()
+
 	entries, err := os.ReadDir(languagePath)
 	if err != nil {
 		return nil, errors.New("no language directory")
 	}
 
-	var languages []Language
+	var language *Language
 
 	for _, e := range entries {
-		fileContent, err := os.Open(languagePath + "/" + e.Name())
+		if e.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if strings.TrimSuffix(e.Name(), ".json") != languageCode {
+			continue
+		}
+
+		fileContent, err := os.Open(filepath.Join(languagePath, e.Name()))
 		if err != nil {
 			return nil, err
 		}
 
 		buff, _ := io.ReadAll(fileContent)
 
-		language := &Language{}
 		if err = json.Unmarshal(buff, &language); err != nil {
 			return nil, err
 		}
 
-		languages = append(languages, *language)
-
 		fileContent.Close()
 	}
 
-	return &Repository{languages}, nil
+	return language, nil
 }
 
-func (rp *Repository) GetLanguageCode(r *http.Request) string {
+func GetLanguageCode(r *http.Request) string {
 	return r.Context().Value("lang").(string)
 }
 
-func (rp *Repository) GetStringByCode(code string, languageCode string) (string, error) {
-	languageIndex := slices.IndexFunc(rp.Languages, func(l Language) bool {
-		return l.Code == languageCode
-	})
+func GetPath() string {
+	path, ok := os.LookupEnv("LANG_PATH")
+	if !ok {
+		return "lang"
+	}
 
-	if languageIndex == -1 {
+	return path
+}
+
+func GetMessage(messageCode, languageCode string) (string, error) {
+	language, err := GetLanguage(languageCode)
+	if err != nil {
 		return "", errors.New("language not found")
 	}
 
-	stringIndex := slices.IndexFunc(rp.Languages[languageIndex].Strings, func(s Message) bool {
-		return s.Code == code
+	messageIndex := slices.IndexFunc(language.Messages, func(m Message) bool {
+		return m.Code == messageCode
 	})
 
-	if stringIndex == -1 {
-		return "", errors.New("string not found")
+	if messageIndex == -1 {
+		return "", errors.New("message not found")
 	}
 
-	return rp.Languages[languageIndex].Strings[stringIndex].Text, nil
+	return language.Messages[messageIndex].Text, nil
 }
 
-func (rp *Repository) GetFormattedStringByCode(code string, values map[string]string, languageCode string) (string, error) {
-	languageString, err := rp.GetStringByCode(code, languageCode)
+func GetFormattedMessage(messageCode string, values map[string]string, languageCode string) (string, error) {
+	languageString, err := GetMessage(messageCode, languageCode)
 	if err != nil {
 		return "", err
 	}
@@ -91,7 +103,7 @@ func (rp *Repository) GetFormattedStringByCode(code string, values map[string]st
 	return languageString, nil
 }
 
-func (rp *Repository) SetLanguageContext(next http.Handler) http.Handler {
+func SetLanguageContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		languageCode := ""
 		languageCookie, err := r.Cookie("lang")
