@@ -2,16 +2,28 @@
   "code": "ru",
   "strings": [
     {
-      "code": "EMAIL_ALREADY_EXISTS",
+      "code": "REGISTRATION_ALREADY_EXIST",
       "text": "Пользователь с таким email уже существует"
     },
     {
-      "code": "REGISTRATION_INVALID_FIELDS",
-      "text": "Некорректные поля регистрации"
+      "code": "REGISTRATION_INVALID_USER_NAME",
+      "text": "Некорректное имя пользователя"
+    },
+    {
+      "code": "REGISTRATION_INVALID_EMAIL",
+      "text": "Некорректный email"
+    },
+    {
+      "code": "REGISTRATION_INVALID_PASSWORD",
+      "text": "Некорректный пароль"
     },
     {
       "code": "LOGIN_USER_NOT_FOUND",
       "text": "Пользователь не найден"
+    },
+    {
+      "code": "LOGIN_INVALID_FIELDS",
+      "text": "Некорректные поля для авторизации"
     },
     {
       "code": "LOGIN_FAILED_TO_CREATE_TOKEN",

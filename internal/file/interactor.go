@@ -13,5 +13,5 @@ type Interactor interface {
 	Get(id uint) (*File, error)
 	GetWhere(where map[string]interface{}) (*File, error)
 	VerifyFileType(buff []byte, types []string) (bool, string)
-	WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, conn *websocket.Conn) (*os.File, error)
+	WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, maxChunkSize int, conn *websocket.Conn) (*os.File, error)
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/render"
 	"net/http"
 	"nine-dubz/internal/helper"
+	"nine-dubz/internal/response"
 	"nine-dubz/internal/token"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
@@ -15,21 +16,20 @@ type Handler struct {
 	UserUseCase    *UseCase
 	TokenUseCase   *token.UseCase
 	TokenAuthorize *tokenauthorize.TokenAuthorize
-	Language       *language.Repository
 }
 
-func NewHandler(uc *UseCase, tuc *token.UseCase, ta *tokenauthorize.TokenAuthorize, lang *language.Repository) *Handler {
+func NewHandler(uc *UseCase, tuc *token.UseCase, ta *tokenauthorize.TokenAuthorize) *Handler {
 	return &Handler{
 		UserUseCase:    uc,
 		TokenUseCase:   tuc,
 		TokenAuthorize: ta,
-		Language:       lang,
 	}
 }
 
 func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	loginRequest := &LoginRequest{}
 	if err := json.NewDecoder(r.Body).Decode(loginRequest); err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "LOGIN_INVALID_FIELDS")
 		return
 	}
 
@@ -45,7 +45,9 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 		http.SetCookie(w, tokenCookie)
 
-		render.JSON(w, r, NewLoginResponse(true))
+		response.RenderSuccess(w, r, http.StatusOK, "")
+	} else {
+		response.RenderError(w, r, http.StatusBadRequest, "LOGIN_USER_NOT_FOUND")
 	}
 }
 
@@ -56,21 +58,26 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	registrationPayload := NewRegistrationRequest(registrationRequest)
-	userId := h.UserUseCase.Register(registrationPayload)
+	userId, err := h.UserUseCase.Register(registrationPayload)
+	if err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	if userId > 0 {
 		h.SendRegistrationEmail(r, registrationPayload)
 
-		render.JSON(w, r, NewRegistrationResponse(true))
+		response.RenderSuccess(w, r, http.StatusOK, "")
 	}
 }
 
 func (h *Handler) SendRegistrationEmail(r *http.Request, user *User) {
-	languageCode := h.Language.GetLanguageCode(r)
+	languageCode := language.GetLanguageCode(r)
 
-	subject, _ := h.Language.GetStringByCode(languageCode, "EMAIL_REGISTRATION_CONFIRMATION")
+	subject, _ := language.GetMessage(languageCode, "EMAIL_REGISTRATION_CONFIRMATION")
 	link := fmt.Sprintf("%s/api/authorize/inner/confirm/?email=%s&hash=%s", "https://"+r.Host, user.Email, user.Hash)
 	contentValues := map[string]string{"userName": user.Name, "link": link}
-	content, _ := h.Language.GetFormattedStringByCode("EMAIL_REGISTRATION_CONFIRMATION_CONTENT", contentValues, languageCode)
+	content, _ := language.GetFormattedMessage("EMAIL_REGISTRATION_CONFIRMATION_CONTENT", contentValues, languageCode)
 
 	h.UserUseCase.SendRegistrationEmail(user.Email, subject, content)
 }

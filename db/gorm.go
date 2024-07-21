@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm/logger"
 	"nine-dubz/internal/apimethod"
 	"nine-dubz/internal/file"
+	"nine-dubz/internal/googleoauth"
 	"nine-dubz/internal/movie"
 	"nine-dubz/internal/role"
 	"nine-dubz/internal/token"
@@ -56,6 +57,7 @@ func NewGormDb() *gorm.DB {
 		&apimethod.ApiMethod{},
 		&token.Token{},
 		&file.File{},
+		&googleoauth.AuthorizeState{},
 	)
 
 	return db

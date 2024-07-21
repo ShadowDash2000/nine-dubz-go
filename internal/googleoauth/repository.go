@@ -2,10 +2,14 @@ package googleoauth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
+	"io"
 	"net/http"
+	"time"
 )
 
 type Repository struct {
@@ -14,12 +18,27 @@ type Repository struct {
 }
 
 func (gor *Repository) GetConsentPageUrl() string {
-	// TODO Make random state
-	return gor.OauthConfig.AuthCodeURL("state-token")
+	buff := make([]byte, 10)
+	io.ReadFull(rand.Reader, buff)
+	state := base64.StdEncoding.EncodeToString(buff)
+
+	result := gor.DB.Create(&AuthorizeState{
+		State: state,
+	})
+	if result.Error != nil {
+		return ""
+	}
+
+	return gor.OauthConfig.AuthCodeURL(state)
 }
 
 func (gor *Repository) Authorize(code string, state string) (*GoogleUserInfo, error) {
-	// TODO State check
+	authorizeState := &AuthorizeState{}
+	maxStateLifeTime := time.Now().Add(-2 * time.Hour)
+	result := gor.DB.Where("created_at > ?", maxStateLifeTime).First(authorizeState, "state = ?", state)
+	if result.Error != nil {
+		return nil, result.Error
+	}
 
 	token, err := gor.OauthConfig.Exchange(context.Background(), code)
 	if err != nil {
