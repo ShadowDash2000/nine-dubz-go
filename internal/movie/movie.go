@@ -69,7 +69,16 @@ func (uc *UseCase) DeleteMultiple(userId uint, movies *[]DeleteRequest) error {
 }
 
 func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *websocket.Conn) error {
-	tmpFile, err := uc.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, header.Filename, conn)
+	movieUpdateRequest := &VideoUpdateRequest{
+		Code: header.MovieCode,
+		Name: header.Filename,
+	}
+	err := uc.UpdateVideo(movieUpdateRequest)
+	if err != nil {
+		return err
+	}
+
+	tmpFile, err := uc.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, conn)
 	if err != nil {
 		uc.Delete(userId, header.MovieCode)
 		return err
@@ -82,6 +91,8 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 
 func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File) error {
 	resizedVideoPath := filepath.Join("upload/resize", header.MovieCode)
+	thumbsPath := filepath.Join("upload/thumbs/", header.MovieCode)
+
 	ffmpegthumbs.ToWebm(tmpFile.Name(), resizedVideoPath, "orig")
 
 	origWebmPath := filepath.Join(resizedVideoPath, "orig.webm")
@@ -89,7 +100,8 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 	origWebmInfo, _ := os.Stat(tmpFile.Name())
 
 	defer origWebm.Close()
-	//defer os.RemoveAll(resizedVideoPath)
+	defer os.RemoveAll(resizedVideoPath)
+	defer os.RemoveAll(thumbsPath)
 	defer os.Remove(tmpFile.Name())
 
 	origWebmFile, err := uc.FileUseCase.SaveFile(origWebm, origWebmInfo.Name(), origWebmInfo.Size(), "private")
@@ -107,7 +119,7 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 	}
 
 	// Thumbs
-	uc.CreateThumbnails(header, tmpFile)
+	uc.CreateThumbnails(thumbsPath, header, tmpFile)
 
 	// Resize
 	uc.CreateResizedVideos(origWebmPath, resizedVideoPath, header, tmpFile)
@@ -115,13 +127,10 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 	return nil
 }
 
-func (uc *UseCase) CreateThumbnails(header *VideoUploadHeader, tmpFile *os.File) error {
-	thumbsPath := filepath.Join("upload/thumbs/", header.MovieCode)
+func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader, tmpFile *os.File) error {
 	thumbsWebvttPath := "/api/file/"
 	imagesFilePath := make([]string, 0)
 	frameDuration := 10
-
-	defer os.RemoveAll(thumbsPath)
 
 	err := ffmpegthumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
 	var defaultPreview *file.File

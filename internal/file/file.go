@@ -129,7 +129,7 @@ func (uc *UseCase) VerifyFileType(buff []byte, types []string) (bool, string) {
 	return uc.FileInteractor.VerifyFileType(buff, types)
 }
 
-func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*os.File, error) {
+func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, conn *websocket.Conn) (*os.File, error) {
 	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, 1024*1024, conn)
 	if err != nil {
 		return nil, err
