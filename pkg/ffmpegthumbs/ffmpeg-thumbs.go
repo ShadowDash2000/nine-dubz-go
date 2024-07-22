@@ -5,11 +5,10 @@ import (
 	"fmt"
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
-
-type FfmpegThumbs struct{}
 
 type Probe struct {
 	Streams []Stream `json:"streams"`
@@ -19,15 +18,17 @@ type Stream struct {
 	DurationTs int    `json:"duration_ts"`
 	Duration   string `json:"duration"`
 	RFrameRate string `json:"r_frame_rate"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
 }
 
-func (vr *FfmpegThumbs) SplitVideoToThumbnails(filePath, outputPath string, frameDuration int) error {
+func SplitVideoToThumbnails(filePath, outputPath string, frameDuration int) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	duration, err := vr.GetVideoDuration(filePath)
+	duration, err := GetVideoDuration(filePath)
 	if err != nil {
 		return err
 	}
@@ -48,7 +49,7 @@ func (vr *FfmpegThumbs) SplitVideoToThumbnails(filePath, outputPath string, fram
 	return nil
 }
 
-func (vr *FfmpegThumbs) GetVideoDuration(filePath string) (int, error) {
+func GetVideoDuration(filePath string) (int, error) {
 	probe := &Probe{}
 	fileInfoJson, err := ffmpeg.Probe(filePath)
 	if err != nil {
@@ -68,16 +69,59 @@ func (vr *FfmpegThumbs) GetVideoDuration(filePath string) (int, error) {
 	return duration, nil
 }
 
-func (vr *FfmpegThumbs) Resize(filePath string, outputPath string, fileName string) error {
+func GetVideoSize(filePath string) (int, int, error) {
+	probe := &Probe{}
+	fileInfoJson, err := ffmpeg.Probe(filePath)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	err = json.Unmarshal([]byte(fileInfoJson), &probe)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return probe.Streams[0].Width, probe.Streams[0].Height, nil
+}
+
+func Resize(width, height int, bitrate, filePath, outputPath, fileName string) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	return ffmpeg.
+	ffmpeg.
 		Input(filePath).
-		Filter("scale", ffmpeg.Args{"-2:240"}).
-		Output(outputPath+"/"+fileName, ffmpeg.KwArgs{"an": ""}).
+		Filter("scale", ffmpeg.Args{fmt.Sprintf("-1:%d", height)}).
+		Filter("pad", ffmpeg.Args{fmt.Sprintf("%d:%d:(%d-iw)/2:(%d-ih)/2", width, height, width, height)}).
+		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
+			"map":   "0:a:0",
+			"c:v":   "libvpx-vp9",
+			"speed": "4",
+			"b:v":   bitrate,
+			"c:a":   "libopus",
+		}).
 		Silent(true).
 		Run()
+
+	return nil
+}
+
+func ToWebm(filePath, outputPath, fileName string) error {
+	err := os.MkdirAll(outputPath, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	ffmpeg.
+		Input(filePath).
+		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
+			"c:v":   "libvpx-vp9",
+			"speed": "4",
+			"c:a":   "libopus",
+		}).
+		Silent(true).
+		Run()
+
+	return nil
 }

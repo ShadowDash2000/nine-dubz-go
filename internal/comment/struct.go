@@ -7,7 +7,7 @@ import (
 )
 
 type Comment struct {
-	*gorm.Model
+	gorm.Model
 	Text      string      `json:"text"`
 	UserId    uint        `json:"-"`
 	User      user.User   `json:"user" gorm:"foreignKey:UserID,references:ID"`

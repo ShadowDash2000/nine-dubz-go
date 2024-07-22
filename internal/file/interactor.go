@@ -7,7 +7,7 @@ import (
 
 type Interactor interface {
 	Add(file *File) (*File, error)
-	Remove(id uint) error
+	Remove(name string) error
 	Save(file *File) error
 	Updates(file *File) error
 	Get(id uint) (*File, error)

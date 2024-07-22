@@ -6,7 +6,7 @@ import (
 )
 
 type AuthorizeState struct {
-	*gorm.Model
+	gorm.Model
 	State string `json:"-"`
 }
 

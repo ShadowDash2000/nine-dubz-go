@@ -19,8 +19,8 @@ func (fr *Repository) Add(file *File) (*File, error) {
 	return file, result.Error
 }
 
-func (fr *Repository) Remove(id uint) error {
-	result := fr.DB.Delete(&File{}, id)
+func (fr *Repository) Remove(name string) error {
+	result := fr.DB.Delete(&File{}, "name = ?", name)
 
 	return result.Error
 }
