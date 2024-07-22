@@ -20,7 +20,6 @@ import (
 
 type UseCase struct {
 	MovieInteractor Interactor
-	FfmpegThumbs    *ffmpegthumbs.FfmpegThumbs
 	WebVtt          *webvtt.WebVTT
 	FileUseCase     *file.UseCase
 }
@@ -30,9 +29,8 @@ func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
 		MovieInteractor: &Repository{
 			DB: db,
 		},
-		FfmpegThumbs: &ffmpegthumbs.FfmpegThumbs{},
-		WebVtt:       &webvtt.WebVTT{},
-		FileUseCase:  fuc,
+		WebVtt:      &webvtt.WebVTT{},
+		FileUseCase: fuc,
 	}
 }
 
@@ -71,29 +69,61 @@ func (uc *UseCase) DeleteMultiple(userId uint, movies *[]DeleteRequest) error {
 }
 
 func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *websocket.Conn) error {
-	videoFile, tmpFile, err := uc.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, header.Filename, conn)
+	tmpFile, err := uc.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, header.Filename, conn)
 	if err != nil {
 		uc.Delete(userId, header.MovieCode)
 		return err
 	}
 
+	go uc.PostProcessVideo(header, tmpFile)
+
+	return nil
+}
+
+func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File) error {
+	resizedVideoPath := filepath.Join("upload/resize", header.MovieCode)
+	ffmpegthumbs.ToWebm(tmpFile.Name(), resizedVideoPath, "orig")
+
+	origWebmPath := filepath.Join(resizedVideoPath, "orig.webm")
+	origWebm, _ := os.Open(origWebmPath)
+	origWebmInfo, _ := os.Stat(tmpFile.Name())
+
+	defer origWebm.Close()
+	//defer os.RemoveAll(resizedVideoPath)
 	defer os.Remove(tmpFile.Name())
+
+	origWebmFile, err := uc.FileUseCase.SaveFile(origWebm, origWebmInfo.Name(), origWebmInfo.Size(), "private")
+	if err != nil {
+		return err
+	}
 
 	movieUpdateRequest := &VideoUpdateRequest{
 		Code:  header.MovieCode,
-		Video: videoFile,
+		Video: origWebmFile,
 	}
 	err = uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
 		return err
 	}
 
-	thumbsPath := "upload/thumbs/" + videoFile.Name
+	// Thumbs
+	uc.CreateThumbnails(header, tmpFile)
+
+	// Resize
+	uc.CreateResizedVideos(origWebmPath, resizedVideoPath, header, tmpFile)
+
+	return nil
+}
+
+func (uc *UseCase) CreateThumbnails(header *VideoUploadHeader, tmpFile *os.File) error {
+	thumbsPath := filepath.Join("upload/thumbs/", header.MovieCode)
 	thumbsWebvttPath := "/api/file/"
 	imagesFilePath := make([]string, 0)
 	frameDuration := 10
 
-	err = uc.FfmpegThumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
+	defer os.RemoveAll(thumbsPath)
+
+	err := ffmpegthumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
 	var defaultPreview *file.File
 	if err != nil {
 		fmt.Println(err)
@@ -120,22 +150,61 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 
 	var savedVttFile *file.File
 	if len(imagesFilePath) > 0 {
-		videoDuration, _ := uc.FfmpegThumbs.GetVideoDuration(tmpFile.Name())
+		videoDuration, _ := ffmpegthumbs.GetVideoDuration(tmpFile.Name())
 		vttFile, _ := uc.WebVtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
 		vttFile, _ = os.Open(vttFile.Name())
 		savedVttFile, _ = uc.FileUseCase.SaveFile(vttFile, vttFile.Name(), 0, "public")
 		vttFile.Close()
 	}
 
-	os.RemoveAll(thumbsPath)
-
-	movieUpdateRequest = &VideoUpdateRequest{
+	movieUpdateRequest := &VideoUpdateRequest{
 		Code:           header.MovieCode,
 		DefaultPreview: defaultPreview,
 		WebVtt:         savedVttFile,
 	}
 	err = uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, header *VideoUploadHeader, tmpFile *os.File) error {
+	var video360 *file.File
+	var video480 *file.File
+
+	_, videoHeight, _ := ffmpegthumbs.GetVideoSize(origWebmPath)
+
+	// 360p
+	if videoHeight > 360 {
+		ffmpegthumbs.Resize(640, 360, "800K", tmpFile.Name(), resizedVideoPath, "360")
+		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "360.webm"))
+		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		if err == nil {
+			video360 = resizedWebmFile
+		}
+	}
+	// 480p
+	if videoHeight > 480 {
+		ffmpegthumbs.Resize(854, 480, "1200K", tmpFile.Name(), resizedVideoPath, "480")
+		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "480.webm"))
+		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		if err == nil {
+			video480 = resizedWebmFile
+		}
+	}
+
+	movieUpdateRequest := &VideoUpdateRequest{
+		Code:     header.MovieCode,
+		Video360: video360,
+		Video480: video480,
+	}
+	err := uc.UpdateVideo(movieUpdateRequest)
+	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -181,13 +250,21 @@ func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRe
 	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
 }
 
-func (uc *UseCase) Get(movieCode string) (*GetResponse, error) {
-	movie, err := uc.MovieInteractor.Get(movieCode)
+func (uc *UseCase) Get(userId uint, code string) (*GetResponse, error) {
+	movie, err := uc.MovieInteractor.Get(code)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewGetResponse(movie), nil
+	if movie.IsPublished {
+		return NewGetResponse(movie), nil
+	}
+
+	if movie.UserId == userId {
+		return NewGetResponse(movie), nil
+	}
+
+	return nil, errors.New("not allowed")
 }
 
 func (uc *UseCase) CheckMovieAccess(userId uint, code string) (*GetResponse, error) {

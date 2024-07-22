@@ -28,6 +28,7 @@ func (h *Handler) MovieRoutes(r chi.Router) {
 					Route("/{movieCode}", func(r chi.Router) {
 						r.Delete("/", h.DeleteHandler)
 						r.Post("/", h.UpdateHandler)
+						r.Get("/", h.GetHandler)
 					})
 				r.Route("/upload", func(r chi.Router) {
 					r.Get("/", h.UploadVideoHandler)
@@ -45,15 +46,17 @@ func (h *Handler) MovieRoutes(r chi.Router) {
 			})
 
 		r.Route("/{movieCode}", func(r chi.Router) {
-			r.Get("/", h.GetHandler)
+			r.
+				With(h.UserHandler.TryToGetUserId).
+				Get("/", h.GetHandler)
 		})
 		r.Route("/stream/{movieCode}", func(r chi.Router) {
 			r.
-				With(h.UserHandler.TryToGetUSerId).
+				With(h.UserHandler.TryToGetUserId).
 				Get("/", h.StreamFile)
 
 			r.
-				With(h.UserHandler.TryToGetUSerId).
+				With(h.UserHandler.TryToGetUserId).
 				Head("/", h.StreamFile)
 		})
 	})

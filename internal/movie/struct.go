@@ -9,7 +9,7 @@ import (
 )
 
 type Movie struct {
-	*gorm.Model
+	gorm.Model
 	ID               uint       `json:"ID"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	Code             string     `json:"code"`
@@ -22,6 +22,12 @@ type Movie struct {
 	Name             string     `json:"name"`
 	VideoId          *uint      `json:"-"`
 	Video            *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
+	Video360Id       *uint      `json:"-"`
+	Video360         *file.File `json:"video360" gorm:"foreignKey:Video360Id;references:ID;"`
+	Video480Id       *uint      `json:"-"`
+	Video480         *file.File `json:"video480" gorm:"foreignKey:Video480Id;references:ID;"`
+	Video720Id       *uint      `json:"-"`
+	Video720         *file.File `json:"video720" gorm:"foreignKey:Video720Id;references:ID;"`
 	UserId           uint       `json:"-"`
 	User             user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
 	WebVttId         *uint      `json:"-"`
@@ -63,6 +69,9 @@ type GetResponse struct {
 	DefaultPreview *file.File `json:"defaultPreview"`
 	Name           string     `json:"name"`
 	Video          *file.File `json:"video"`
+	Video360       *file.File `json:"video360"`
+	Video480       *file.File `json:"video480"`
+	Video720       *file.File `json:"video720"`
 	WebVtt         *file.File `json:"webVtt"`
 }
 
@@ -75,6 +84,9 @@ func NewGetResponse(movie *Movie) *GetResponse {
 		DefaultPreview: movie.DefaultPreview,
 		Name:           movie.Name,
 		Video:          movie.Video,
+		Video360:       movie.Video360,
+		Video480:       movie.Video480,
+		Video720:       movie.Video720,
 		WebVtt:         movie.WebVtt,
 	}
 }
@@ -107,6 +119,9 @@ type VideoUpdateRequest struct {
 	Name           string     `json:"name"`
 	Code           string     `json:"code"`
 	Video          *file.File `json:"video"`
+	Video360       *file.File `json:"video360"`
+	Video480       *file.File `json:"video480"`
+	Video720       *file.File `json:"video720"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	WebVtt         *file.File `json:"webVtt"`
 }
@@ -116,6 +131,9 @@ func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 		Name:           movie.Name,
 		Code:           movie.Code,
 		Video:          movie.Video,
+		Video360:       movie.Video360,
+		Video480:       movie.Video480,
+		Video720:       movie.Video720,
 		DefaultPreview: movie.DefaultPreview,
 		WebVtt:         movie.WebVtt,
 	}

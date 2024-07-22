@@ -186,8 +186,12 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
+	userId := r.Context().Value("userId")
+	if userId == nil {
+		userId = uint(0)
+	}
 
-	movie, err := h.MovieUseCase.Get(movieCode)
+	movie, err := h.MovieUseCase.Get(userId.(uint), movieCode)
 	if err != nil {
 		http.Error(w, "Movie not found", http.StatusNotFound)
 		return

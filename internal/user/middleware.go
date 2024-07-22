@@ -32,7 +32,7 @@ func (h *Handler) IsAuthorized(next http.Handler) http.Handler {
 	})
 }
 
-func (h *Handler) TryToGetUSerId(next http.Handler) http.Handler {
+func (h *Handler) TryToGetUserId(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenCookie, err := r.Cookie("token")
 		if err != nil {

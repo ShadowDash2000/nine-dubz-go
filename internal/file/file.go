@@ -116,44 +116,29 @@ func (uc *UseCase) SaveFile(file io.Reader, fileName string, fileSize int64, fil
 	return savedFile, nil
 }
 
+func (uc *UseCase) RemoveFile(fileName string) error {
+	_, err := uc.S3Storage.DeleteObject(fileName)
+	if err != nil {
+		return err
+	}
+
+	return uc.FileInteractor.Remove(fileName)
+}
+
 func (uc *UseCase) VerifyFileType(buff []byte, types []string) (bool, string) {
 	return uc.FileInteractor.VerifyFileType(buff, types)
 }
 
-func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*File, *os.File, error) {
+func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, fileName string, conn *websocket.Conn) (*os.File, error) {
 	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, 1024*1024, conn)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	conn.Close()
 
-	timeNow := time.Now().UnixNano()
-	newFileName := strconv.Itoa(int(timeNow))
-	extension := filepath.Ext(fileName)
-
 	tmpFile, _ = os.Open(tmpFile.Name())
 	defer tmpFile.Close()
 
-	_, err = uc.S3Storage.PutObject(tmpFile, newFileName)
-	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return nil, nil, err
-	}
-
-	savedFile, err := uc.FileInteractor.Add(&File{
-		Name:         newFileName,
-		Extension:    extension,
-		OriginalName: fileName,
-		Size:         int64(fileSize),
-		Type:         "private",
-	})
-	if err != nil {
-		os.Remove(tmpFile.Name())
-		uc.S3Storage.DeleteObject(newFileName)
-		return nil, nil, err
-	}
-
-	return savedFile, tmpFile, nil
+	return tmpFile, nil
 }
