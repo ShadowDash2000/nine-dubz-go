@@ -84,44 +84,53 @@ func GetVideoSize(filePath string) (int, int, error) {
 	return probe.Streams[0].Width, probe.Streams[0].Height, nil
 }
 
-func Resize(width, height int, bitrate, filePath, outputPath, fileName string) error {
+func Resize(height int, crf, speed, bitrate, filePath, outputPath, fileName string) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	ffmpeg.
+	err = ffmpeg.
 		Input(filePath).
 		Filter("scale", ffmpeg.Args{fmt.Sprintf("-1:%d", height)}).
-		Filter("pad", ffmpeg.Args{fmt.Sprintf("%d:%d:(%d-iw)/2:(%d-ih)/2", width, height, width, height)}).
 		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
 			"map":   "0:a:0",
 			"c:v":   "libvpx-vp9",
-			"speed": "4",
+			"crf":   crf,
+			"speed": speed,
 			"b:v":   bitrate,
 			"c:a":   "libopus",
 		}).
 		Silent(true).
 		Run()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 
 	return nil
 }
 
-func ToWebm(filePath, outputPath, fileName string) error {
+func ToWebm(filePath, crf, speed, bitrate, outputPath, fileName string) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	ffmpeg.
+	err = ffmpeg.
 		Input(filePath).
 		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
 			"c:v":   "libvpx-vp9",
-			"speed": "4",
+			"crf":   crf,
+			"speed": speed,
+			"b:v":   bitrate,
 			"c:a":   "libopus",
 		}).
 		Silent(true).
 		Run()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

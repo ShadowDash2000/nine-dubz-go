@@ -93,7 +93,7 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 	resizedVideoPath := filepath.Join("upload/resize", header.MovieCode)
 	thumbsPath := filepath.Join("upload/thumbs/", header.MovieCode)
 
-	ffmpegthumbs.ToWebm(tmpFile.Name(), resizedVideoPath, "orig")
+	ffmpegthumbs.ToWebm(tmpFile.Name(), "31", "1", "3000", resizedVideoPath, "orig")
 
 	origWebmPath := filepath.Join(resizedVideoPath, "orig.webm")
 	origWebm, _ := os.Open(origWebmPath)
@@ -180,14 +180,25 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 }
 
 func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, header *VideoUploadHeader, tmpFile *os.File) error {
+	var videoShakal *file.File
 	var video360 *file.File
 	var video480 *file.File
+	var video720 *file.File
 
 	_, videoHeight, _ := ffmpegthumbs.GetVideoSize(origWebmPath)
-
+	// 0P
+	if videoHeight > 0 {
+		ffmpegthumbs.Resize(240, "50", "5", "5", tmpFile.Name(), resizedVideoPath, "shakal")
+		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "shakal.webm"))
+		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		if err == nil {
+			videoShakal = resizedWebmFile
+		}
+	}
 	// 360p
 	if videoHeight > 360 {
-		ffmpegthumbs.Resize(640, 360, "800K", tmpFile.Name(), resizedVideoPath, "360")
+		ffmpegthumbs.Resize(360, "33", "3", "900k", tmpFile.Name(), resizedVideoPath, "360")
 		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "360.webm"))
 		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
 		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
@@ -197,7 +208,7 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 	}
 	// 480p
 	if videoHeight > 480 {
-		ffmpegthumbs.Resize(854, 480, "1200K", tmpFile.Name(), resizedVideoPath, "480")
+		ffmpegthumbs.Resize(480, "33", "3", "1000k", tmpFile.Name(), resizedVideoPath, "480")
 		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "480.webm"))
 		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
 		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
@@ -205,11 +216,23 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 			video480 = resizedWebmFile
 		}
 	}
+	// 7200p
+	if videoHeight > 720 {
+		ffmpegthumbs.Resize(720, "32", "2", "1800k", tmpFile.Name(), resizedVideoPath, "720")
+		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "720.webm"))
+		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		if err == nil {
+			video720 = resizedWebmFile
+		}
+	}
 
 	movieUpdateRequest := &VideoUpdateRequest{
-		Code:     header.MovieCode,
-		Video360: video360,
-		Video480: video480,
+		Code:        header.MovieCode,
+		Video360:    video360,
+		Video480:    video480,
+		Video720:    video720,
+		VideoShakal: videoShakal,
 	}
 	err := uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {

@@ -22,6 +22,8 @@ type Movie struct {
 	Name             string     `json:"name"`
 	VideoId          *uint      `json:"-"`
 	Video            *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
+	VideoShakalId    *uint      `json:"-"`
+	VideoShakal      *file.File `json:"videoShakal" gorm:"foreignKey:VideoShakalId;references:ID;"`
 	Video360Id       *uint      `json:"-"`
 	Video360         *file.File `json:"video360" gorm:"foreignKey:Video360Id;references:ID;"`
 	Video480Id       *uint      `json:"-"`
@@ -69,6 +71,7 @@ type GetResponse struct {
 	DefaultPreview *file.File `json:"defaultPreview"`
 	Name           string     `json:"name"`
 	Video          *file.File `json:"video"`
+	VideoShakal    *file.File `json:"videoShakal"`
 	Video360       *file.File `json:"video360"`
 	Video480       *file.File `json:"video480"`
 	Video720       *file.File `json:"video720"`
@@ -84,6 +87,7 @@ func NewGetResponse(movie *Movie) *GetResponse {
 		DefaultPreview: movie.DefaultPreview,
 		Name:           movie.Name,
 		Video:          movie.Video,
+		VideoShakal:    movie.VideoShakal,
 		Video360:       movie.Video360,
 		Video480:       movie.Video480,
 		Video720:       movie.Video720,
@@ -119,6 +123,7 @@ type VideoUpdateRequest struct {
 	Name           string     `json:"name"`
 	Code           string     `json:"code"`
 	Video          *file.File `json:"video"`
+	VideoShakal    *file.File `json:"videoShakal"`
 	Video360       *file.File `json:"video360"`
 	Video480       *file.File `json:"video480"`
 	Video720       *file.File `json:"video720"`
@@ -131,6 +136,7 @@ func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 		Name:           movie.Name,
 		Code:           movie.Code,
 		Video:          movie.Video,
+		VideoShakal:    movie.VideoShakal,
 		Video360:       movie.Video360,
 		Video480:       movie.Video480,
 		Video720:       movie.Video720,
