@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/alitto/pond"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
@@ -14,20 +15,23 @@ import (
 	"nine-dubz/pkg/webvtt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type UseCase struct {
 	MovieInteractor Interactor
+	Pool            *pond.WorkerPool
 	FileUseCase     *file.UseCase
 }
 
-func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
+func New(db *gorm.DB, pool *pond.WorkerPool, fuc *file.UseCase) *UseCase {
 	return &UseCase{
 		MovieInteractor: &Repository{
 			DB: db,
 		},
+		Pool:        pool,
 		FileUseCase: fuc,
 	}
 }
@@ -125,7 +129,9 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 		return err
 	}
 
-	go uc.PostProcessVideo(header, tmpFile)
+	uc.Pool.Submit(func() {
+		uc.PostProcessVideo(header, tmpFile)
+	})
 
 	return nil
 }
@@ -134,13 +140,20 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 	resizedVideoPath := filepath.Join("upload/resize", header.MovieCode)
 	thumbsPath := filepath.Join("upload/thumbs/", header.MovieCode)
 
-	ffmpegthumbs.ToWebm(tmpFile.Name(), "31", "1", "3000", resizedVideoPath, "orig")
+	bitrate, err := ffmpegthumbs.GetVideoBitrate(tmpFile.Name())
+	if err != nil || bitrate <= 0 {
+		bitrate = 30000
+	}
+
+	ffmpegthumbs.ToWebm(tmpFile.Name(), "31", "1", strconv.Itoa(bitrate), resizedVideoPath, "orig")
 
 	origWebmPath := filepath.Join(resizedVideoPath, "orig.webm")
-	origWebm, _ := os.Open(origWebmPath)
+	origWebm, err := os.Open(origWebmPath)
+	if err != nil {
+		return err
+	}
 	origWebmInfo, _ := os.Stat(tmpFile.Name())
 
-	defer origWebm.Close()
 	defer os.RemoveAll(resizedVideoPath)
 	defer os.RemoveAll(thumbsPath)
 	defer os.Remove(tmpFile.Name())
@@ -150,14 +163,15 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 		return err
 	}
 
+	origWebm.Close()
+
 	movieUpdateRequest := &VideoUpdateRequest{
 		Code:  header.MovieCode,
 		Video: origWebmFile,
 	}
 	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
-	if err != nil {
-		return err
-	} else if rowsAffected == 0 {
+	if err != nil || rowsAffected == 0 {
+		uc.DeleteMovieFiles(NewVideoUpdateRequest(movieUpdateRequest))
 		return errors.New("failed to update video")
 	}
 
@@ -166,6 +180,15 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 
 	// Resize
 	uc.CreateResizedVideos(origWebmPath, resizedVideoPath, header, tmpFile)
+
+	// Check if movie was deleted while post-processing
+	movie, err := uc.MovieInteractor.Get(header.MovieCode)
+	if err == nil {
+		if movie.DeletedAt.Valid {
+			uc.DeleteMovieFiles(movie)
+			return errors.New("movie was deleted while post-processing")
+		}
+	}
 
 	return nil
 }
@@ -192,7 +215,7 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 			imageFileInfo, _ := imageFile.Stat()
 			savedImageFile, _ := uc.FileUseCase.SaveFile(imageFile, item.Name(), imageFileInfo.Size(), "public")
 			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
-			imagesNames = append(imagesFilePath, savedImageFile.Name)
+			imagesNames = append(imagesNames, savedImageFile.Name)
 
 			if defaultPreviewPos == i+1 {
 				defaultPreview = savedImageFile
@@ -237,41 +260,53 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 	// 0P
 	if videoHeight > 0 {
 		ffmpegthumbs.Resize(240, "50", "5", "5", tmpFile.Name(), resizedVideoPath, "shakal")
-		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "shakal.webm"))
-		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
-		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "shakal.webm"))
 		if err == nil {
-			videoShakal = resizedWebmFile
+			resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+			resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+			if err == nil {
+				videoShakal = resizedWebmFile
+			}
+			resizedWebm.Close()
 		}
 	}
 	// 360p
 	if videoHeight > 360 {
 		ffmpegthumbs.Resize(360, "33", "3", "900k", tmpFile.Name(), resizedVideoPath, "360")
-		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "360.webm"))
-		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
-		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "360.webm"))
 		if err == nil {
-			video360 = resizedWebmFile
+			resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+			resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+			if err == nil {
+				video360 = resizedWebmFile
+			}
+			resizedWebm.Close()
 		}
 	}
 	// 480p
 	if videoHeight > 480 {
 		ffmpegthumbs.Resize(480, "33", "3", "1000k", tmpFile.Name(), resizedVideoPath, "480")
-		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "480.webm"))
-		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
-		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "480.webm"))
 		if err == nil {
-			video480 = resizedWebmFile
+			resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+			resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+			if err == nil {
+				video480 = resizedWebmFile
+			}
+			resizedWebm.Close()
 		}
 	}
-	// 7200p
+	// 720p
 	if videoHeight > 720 {
 		ffmpegthumbs.Resize(720, "32", "2", "1800k", tmpFile.Name(), resizedVideoPath, "720")
-		resizedWebm, _ := os.Open(filepath.Join(resizedVideoPath, "720.webm"))
-		resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
-		resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "720.webm"))
 		if err == nil {
-			video720 = resizedWebmFile
+			resizedWebmInfo, _ := os.Stat(resizedWebm.Name())
+			resizedWebmFile, err := uc.FileUseCase.SaveFile(resizedWebm, resizedWebmInfo.Name(), resizedWebmInfo.Size(), "private")
+			if err == nil {
+				video720 = resizedWebmFile
+			}
+			resizedWebm.Close()
 		}
 	}
 

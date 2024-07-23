@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"github.com/alitto/pond"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
@@ -19,8 +20,6 @@ import (
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -37,12 +36,15 @@ func NewApp(db gorm.DB) *App {
 }
 
 func (app *App) Start() {
+	pool := pond.New(10, 300)
+	defer pool.StopAndWait()
+
 	// Use cases
 	muc := mail.New()
 	fuc := file.New(app.DB)
 	tuc := token.New(app.DB)
 	ruc := role.New(app.DB)
-	movuc := movie.New(app.DB, fuc)
+	movuc := movie.New(app.DB, pool, fuc)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc)
 
@@ -97,22 +99,6 @@ func (app *App) Start() {
 		http.ServeFile(w, r, "public/socket_test.html")
 	})
 
-	workDir, _ := os.Getwd()
-	filesDir := http.Dir(filepath.Join(workDir, "upload/"))
-	FileServer(app.Router, "/upload", filesDir)
-
-	app.Router.Route("/upload/tmp", func(r chi.Router) {
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-		})
-	})
-
-	app.Router.Route("/upload/video", func(r chi.Router) {
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-		})
-	})
-
 	app.Router.Route("/api", func(r chi.Router) {
 		uh.Routes(r)
 		fh.Routes(r)
@@ -135,23 +121,4 @@ func (app *App) Start() {
 	if err != nil {
 		return
 	}
-}
-
-func FileServer(r chi.Router, path string, root http.FileSystem) {
-	if strings.ContainsAny(path, "{}*") {
-		panic("FileServer does not permit any URL parameters.")
-	}
-
-	if path != "/" && path[len(path)-1] != '/' {
-		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
-		path += "/"
-	}
-	path += "*"
-
-	r.Get(path, func(w http.ResponseWriter, r *http.Request) {
-		rctx := chi.RouteContext(r.Context())
-		pathPrefix := strings.TrimSuffix(rctx.RoutePattern(), "/*")
-		fs := http.StripPrefix(pathPrefix, http.FileServer(root))
-		fs.ServeHTTP(w, r)
-	})
 }

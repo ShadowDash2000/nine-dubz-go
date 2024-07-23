@@ -12,6 +12,11 @@ import (
 
 type Probe struct {
 	Streams []Stream `json:"streams"`
+	Format  Format   `json:"format"`
+}
+
+type Format struct {
+	Bitrate string `json:"bit_rate"`
 }
 
 type Stream struct {
@@ -82,6 +87,26 @@ func GetVideoSize(filePath string) (int, int, error) {
 	}
 
 	return probe.Streams[0].Width, probe.Streams[0].Height, nil
+}
+
+func GetVideoBitrate(filePath string) (int, error) {
+	probe := &Probe{}
+	fileInfoJson, err := ffmpeg.Probe(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	err = json.Unmarshal([]byte(fileInfoJson), &probe)
+	if err != nil {
+		return 0, err
+	}
+
+	bitrate, err := strconv.Atoi(probe.Format.Bitrate)
+	if err != nil {
+		return 0, err
+	}
+
+	return bitrate, nil
 }
 
 func Resize(height int, crf, speed, bitrate, filePath, outputPath, fileName string) error {

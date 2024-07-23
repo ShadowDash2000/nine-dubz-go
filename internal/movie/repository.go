@@ -54,6 +54,22 @@ func (mr *Repository) Get(code string) (*Movie, error) {
 	return movie, result.Error
 }
 
+func (mr *Repository) GetUnscoped(code string) (*Movie, error) {
+	movie := &Movie{}
+	result := mr.DB.
+		Unscoped().
+		Preload("Video").
+		Preload("Video360").
+		Preload("Video480").
+		Preload("Video720").
+		Preload("Preview").
+		Preload("DefaultPreview").
+		Preload("WebVtt").
+		First(&movie, "code = ?", code)
+
+	return movie, result.Error
+}
+
 func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
