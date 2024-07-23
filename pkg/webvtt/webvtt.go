@@ -7,9 +7,7 @@ import (
 	"time"
 )
 
-type WebVTT struct{}
-
-func (wvtt *WebVTT) CreateFromFolder(folderPath, outputPath string, videoDuration, frameDuration int) error {
+func CreateFromFolder(folderPath, outputPath string, videoDuration, frameDuration int) error {
 	file, err := os.Create(filepath.Join(outputPath, "thumbs.vtt"))
 	if err != nil {
 		return err
@@ -45,7 +43,7 @@ func (wvtt *WebVTT) CreateFromFolder(folderPath, outputPath string, videoDuratio
 	return nil
 }
 
-func (wvtt *WebVTT) CreateFromFilePaths(filePaths []string, outputPath string, videoDuration, frameDuration int) (*os.File, error) {
+func CreateFromFilePaths(filePaths []string, outputPath string, videoDuration, frameDuration int) (*os.File, error) {
 	file, err := os.Create(filepath.Join(outputPath, "thumbs.vtt"))
 	if err != nil {
 		return nil, err
