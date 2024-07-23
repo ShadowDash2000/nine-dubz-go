@@ -43,12 +43,15 @@ func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
 		Preload("Video").
+		Preload("VideoShakal").
 		Preload("Video360").
 		Preload("Video480").
 		Preload("Video720").
 		Preload("Preview").
 		Preload("DefaultPreview").
 		Preload("WebVtt").
+		Preload("User").
+		Preload("User.Picture").
 		First(&movie, "code = ?", code)
 
 	return movie, result.Error
@@ -59,6 +62,7 @@ func (mr *Repository) GetUnscoped(code string) (*Movie, error) {
 	result := mr.DB.
 		Unscoped().
 		Preload("Video").
+		Preload("VideoShakal").
 		Preload("Video360").
 		Preload("Video480").
 		Preload("Video720").
@@ -74,6 +78,7 @@ func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movi
 	movie := &Movie{}
 	result := mr.DB.
 		Preload("Video").
+		Preload("VideoShakal").
 		Preload("Video360").
 		Preload("Video480").
 		Preload("Video720").
@@ -90,6 +95,7 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 	movies := &[]Movie{}
 	result := mr.DB.
 		Preload("Video").
+		Preload("VideoShakal").
 		Preload("Video360").
 		Preload("Video480").
 		Preload("Video720").
@@ -108,12 +114,15 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination) (*[]Movie, 
 	movies := &[]Movie{}
 	result := mr.DB.
 		Preload("Video").
+		Preload("VideoShakal").
 		Preload("Video360").
 		Preload("Video480").
 		Preload("Video720").
 		Preload("Preview").
 		Preload("DefaultPreview").
 		Preload("WebVtt").
+		Preload("User").
+		Preload("User.Picture").
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Where("is_published = 1").

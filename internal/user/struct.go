@@ -33,6 +33,18 @@ func NewShortResponse(user *User) *ShortResponse {
 	}
 }
 
+type GetPublicResponse struct {
+	Name    string     `json:"name"`
+	Picture *file.File `json:"picture"`
+}
+
+func NewGetPublicResponse(user *User) *GetPublicResponse {
+	return &GetPublicResponse{
+		Name:    user.Name,
+		Picture: user.Picture,
+	}
+}
+
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`

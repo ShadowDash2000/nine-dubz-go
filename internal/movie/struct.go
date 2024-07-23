@@ -65,24 +65,23 @@ func NewAddResponse(movie *Movie) *AddResponse {
 }
 
 type GetResponse struct {
-	IsPublished    bool       `json:"isPublished"`
-	Code           string     `json:"code"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	Description    string     `json:"description"`
-	Preview        *file.File `json:"preview"`
-	DefaultPreview *file.File `json:"defaultPreview"`
-	Name           string     `json:"name"`
-	Video          *file.File `json:"video"`
-	VideoShakal    *file.File `json:"videoShakal"`
-	Video360       *file.File `json:"video360"`
-	Video480       *file.File `json:"video480"`
-	Video720       *file.File `json:"video720"`
-	WebVtt         *file.File `json:"webVtt"`
+	Code           string                  `json:"code"`
+	CreatedAt      time.Time               `json:"createdAt"`
+	Description    string                  `json:"description"`
+	Preview        *file.File              `json:"preview"`
+	DefaultPreview *file.File              `json:"defaultPreview"`
+	Name           string                  `json:"name"`
+	Video          *file.File              `json:"video"`
+	VideoShakal    *file.File              `json:"videoShakal"`
+	Video360       *file.File              `json:"video360"`
+	Video480       *file.File              `json:"video480"`
+	Video720       *file.File              `json:"video720"`
+	WebVtt         *file.File              `json:"webVtt"`
+	User           *user.GetPublicResponse `json:"user"`
 }
 
 func NewGetResponse(movie *Movie) *GetResponse {
 	return &GetResponse{
-		IsPublished:    movie.IsPublished,
 		Code:           movie.Code,
 		CreatedAt:      movie.CreatedAt,
 		Description:    movie.Description,
@@ -95,6 +94,7 @@ func NewGetResponse(movie *Movie) *GetResponse {
 		Video480:       movie.Video480,
 		Video720:       movie.Video720,
 		WebVtt:         movie.WebVtt,
+		User:           user.NewGetPublicResponse(&movie.User),
 	}
 }
 

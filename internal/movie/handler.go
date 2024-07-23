@@ -200,6 +200,22 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, movie)
 }
 
+func (h *Handler) GetForUserHandler(w http.ResponseWriter, r *http.Request) {
+	movieCode := chi.URLParam(r, "movieCode")
+	userId := r.Context().Value("userId")
+	if userId == nil {
+		userId = uint(0)
+	}
+
+	movie, err := h.MovieUseCase.GetForUser(userId.(uint), movieCode)
+	if err != nil {
+		http.Error(w, "Movie not found", http.StatusNotFound)
+		return
+	}
+
+	render.JSON(w, r, movie)
+}
+
 func (h *Handler) GetMultipleForUserHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
