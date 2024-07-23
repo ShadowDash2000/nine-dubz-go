@@ -34,6 +34,7 @@ type Movie struct {
 	User             user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
 	WebVttId         *uint      `json:"-"`
 	WebVtt           *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
+	WebVttImages     string     `json:"-"`
 }
 
 type VideoUploadHeader struct {
@@ -129,6 +130,7 @@ type VideoUpdateRequest struct {
 	Video720       *file.File `json:"video720"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	WebVtt         *file.File `json:"webVtt"`
+	WebVttImages   string     `json:"-"`
 }
 
 func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
@@ -142,6 +144,7 @@ func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 		Video720:       movie.Video720,
 		DefaultPreview: movie.DefaultPreview,
 		WebVtt:         movie.WebVtt,
+		WebVttImages:   movie.WebVttImages,
 	}
 }
 

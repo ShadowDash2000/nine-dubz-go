@@ -80,7 +80,7 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 		Preload("Preview").
 		Preload("DefaultPreview").
 		Preload("WebVtt").
-		Where("user_id = ? AND video_id IS NOT NULL", userId).
+		Where("user_id = ?", userId).
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Find(&movies)

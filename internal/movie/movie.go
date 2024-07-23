@@ -20,7 +20,6 @@ import (
 
 type UseCase struct {
 	MovieInteractor Interactor
-	WebVtt          *webvtt.WebVTT
 	FileUseCase     *file.UseCase
 }
 
@@ -29,7 +28,6 @@ func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
 		MovieInteractor: &Repository{
 			DB: db,
 		},
-		WebVtt:      &webvtt.WebVTT{},
 		FileUseCase: fuc,
 	}
 }
@@ -54,8 +52,49 @@ func (uc *UseCase) Add(movieAddRequest *AddRequest) (*AddResponse, error) {
 	return NewAddResponse(movie), nil
 }
 
+func (uc *UseCase) DeleteMovieFiles(movie *Movie) {
+	if movie.Video != nil {
+		uc.FileUseCase.RemoveFile(movie.Video.Name)
+	}
+	if movie.VideoShakal != nil {
+		uc.FileUseCase.RemoveFile(movie.VideoShakal.Name)
+	}
+	if movie.Video360 != nil {
+		uc.FileUseCase.RemoveFile(movie.Video360.Name)
+	}
+	if movie.Video480 != nil {
+		uc.FileUseCase.RemoveFile(movie.Video480.Name)
+	}
+	if movie.Video720 != nil {
+		uc.FileUseCase.RemoveFile(movie.Video720.Name)
+	}
+	if movie.WebVtt != nil {
+		uc.FileUseCase.RemoveFile(movie.WebVtt.Name)
+	}
+	if len(movie.WebVttImages) > 0 {
+		imagesNames := strings.Split(movie.WebVttImages, ";")
+		for _, imageName := range imagesNames {
+			uc.FileUseCase.RemoveFile(imageName)
+		}
+	}
+}
+
 func (uc *UseCase) Delete(userId uint, code string) error {
-	return uc.MovieInteractor.Delete(userId, code)
+	movie, err := uc.MovieInteractor.GetWhere(code, map[string]interface{}{
+		"user_id": userId,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = uc.MovieInteractor.Delete(userId, code)
+	if err != nil {
+		return err
+	}
+
+	go uc.DeleteMovieFiles(movie)
+
+	return nil
 }
 
 func (uc *UseCase) DeleteMultiple(userId uint, movies *[]DeleteRequest) error {
@@ -129,6 +168,7 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 
 func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader, tmpFile *os.File) error {
 	thumbsWebvttPath := "/api/file/"
+	var imagesNames []string
 	imagesFilePath := make([]string, 0)
 	frameDuration := 10
 
@@ -148,6 +188,7 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 			imageFileInfo, _ := imageFile.Stat()
 			savedImageFile, _ := uc.FileUseCase.SaveFile(imageFile, item.Name(), imageFileInfo.Size(), "public")
 			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
+			imagesNames = append(imagesFilePath, savedImageFile.Name)
 
 			if defaultPreviewPos == i+1 {
 				defaultPreview = savedImageFile
@@ -160,7 +201,7 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 	var savedVttFile *file.File
 	if len(imagesFilePath) > 0 {
 		videoDuration, _ := ffmpegthumbs.GetVideoDuration(tmpFile.Name())
-		vttFile, _ := uc.WebVtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
+		vttFile, _ := webvtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
 		vttFile, _ = os.Open(vttFile.Name())
 		savedVttFile, _ = uc.FileUseCase.SaveFile(vttFile, vttFile.Name(), 0, "public")
 		vttFile.Close()
@@ -170,6 +211,7 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 		Code:           header.MovieCode,
 		DefaultPreview: defaultPreview,
 		WebVtt:         savedVttFile,
+		WebVttImages:   strings.Join(imagesNames, ";"),
 	}
 	err = uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
