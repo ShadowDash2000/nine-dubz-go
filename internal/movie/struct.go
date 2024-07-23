@@ -150,11 +150,11 @@ func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 
 type UpdateRequest struct {
 	Code          string                `json:"code"`
-	IsPublished   bool                  `json:"isPublished"`
-	Description   string                `json:"description"`
+	IsPublished   bool                  `json:"isPublished,omitempty"`
+	Description   string                `json:"description,omitempty"`
 	Preview       multipart.File        `json:"preview,omitempty"`
 	PreviewHeader *multipart.FileHeader `json:"-"`
-	Name          string                `json:"name"`
+	Name          string                `json:"name,omitempty"`
 }
 
 func NewUpdateRequest(movie *UpdateRequest) *Movie {
