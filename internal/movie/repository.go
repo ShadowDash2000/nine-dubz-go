@@ -33,10 +33,10 @@ func (mr *Repository) Updates(movie *Movie) error {
 	return result.Error
 }
 
-func (mr *Repository) UpdatesWhere(movie *Movie, where map[string]interface{}) error {
+func (mr *Repository) UpdatesWhere(movie *Movie, where map[string]interface{}) (int64, error) {
 	result := mr.DB.Where(where).Updates(&movie)
 
-	return result.Error
+	return result.RowsAffected, result.Error
 }
 
 func (mr *Repository) Get(code string) (*Movie, error) {
