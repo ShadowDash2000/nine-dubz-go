@@ -65,6 +65,7 @@ func NewAddResponse(movie *Movie) *AddResponse {
 }
 
 type GetResponse struct {
+	IsPublished    bool       `json:"isPublished"`
 	Code           string     `json:"code"`
 	CreatedAt      time.Time  `json:"createdAt"`
 	Description    string     `json:"description"`
@@ -81,6 +82,7 @@ type GetResponse struct {
 
 func NewGetResponse(movie *Movie) *GetResponse {
 	return &GetResponse{
+		IsPublished:    movie.IsPublished,
 		Code:           movie.Code,
 		CreatedAt:      movie.CreatedAt,
 		Description:    movie.Description,
