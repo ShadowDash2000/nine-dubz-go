@@ -449,6 +449,15 @@ func (uc *UseCase) GetMultipleByUserId(userId uint, pagination *pagination.Pagin
 	return moviesPayload, nil
 }
 
+func (uc *UseCase) GetForUser(userId uint, code string) (*GetForUserResponse, error) {
+	movie, err := uc.MovieInteractor.GetWhere(code, map[string]interface{}{"user_id": userId})
+	if err != nil {
+		return nil, err
+	}
+
+	return NewGetForUserResponse(movie), nil
+}
+
 func (uc *UseCase) GetMultiple(pagination *pagination.Pagination) ([]*GetResponse, error) {
 	if pagination.Limit > 20 {
 		pagination.Limit = 20

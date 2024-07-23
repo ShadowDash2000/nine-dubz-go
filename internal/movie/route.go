@@ -28,7 +28,7 @@ func (h *Handler) MovieRoutes(r chi.Router) {
 					Route("/{movieCode}", func(r chi.Router) {
 						r.Delete("/", h.DeleteHandler)
 						r.Post("/", h.UpdateHandler)
-						r.Get("/", h.GetHandler)
+						r.Get("/", h.GetForUserHandler)
 					})
 				r.Route("/upload", func(r chi.Router) {
 					r.Get("/", h.UploadVideoHandler)
