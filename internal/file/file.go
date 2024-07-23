@@ -1,10 +1,12 @@
 package file
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
+	"math/rand"
 	"net/http"
 	"nine-dubz/pkg/s3storage"
 	"os"
@@ -93,7 +95,9 @@ func (uc *UseCase) GetFile(fileName string) ([]byte, error) {
 
 func (uc *UseCase) SaveFile(file io.Reader, fileName string, fileSize int64, fileType string) (*File, error) {
 	timeNow := time.Now().UnixNano()
-	newFileName := strconv.Itoa(int(timeNow))
+	randomNumber := rand.Intn(1000)
+
+	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
 	extension := filepath.Ext(fileName)
 
 	_, err := uc.S3Storage.PutObject(file, newFileName)
