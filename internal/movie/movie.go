@@ -293,6 +293,13 @@ func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) error {
 func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	movieRequest := NewUpdateRequest(movie)
 
+	if len(movie.Name) > 130 {
+		return errors.New("movie name too long")
+	}
+	if len(movie.Description) > 5000 {
+		return errors.New("movie description too long")
+	}
+
 	if movie.PreviewHeader != nil && movie.PreviewHeader.Size > 0 {
 		buff := make([]byte, 512)
 		_, err := movie.Preview.Read(buff)
