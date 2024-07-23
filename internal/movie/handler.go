@@ -286,7 +286,8 @@ func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := h.MovieUseCase.UpdatePublishStatus(userId.(uint), movieUpdatePublishStatusRequest); err != nil {
+	rowsAffected, err := h.MovieUseCase.UpdatePublishStatus(userId.(uint), movieUpdatePublishStatusRequest)
+	if err != nil || rowsAffected == 0 {
 		http.Error(w, "Movie not found", http.StatusNotFound)
 		return
 	}

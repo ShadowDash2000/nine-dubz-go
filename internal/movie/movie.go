@@ -112,9 +112,11 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 		Code: header.MovieCode,
 		Name: header.Filename,
 	}
-	err := uc.UpdateVideo(movieUpdateRequest)
+	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
 		return err
+	} else if rowsAffected == 0 {
+		return errors.New("failed to update video")
 	}
 
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket([]string{"video/mp4"}, header.Size, conn)
@@ -152,9 +154,11 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 		Code:  header.MovieCode,
 		Video: origWebmFile,
 	}
-	err = uc.UpdateVideo(movieUpdateRequest)
+	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
 		return err
+	} else if rowsAffected == 0 {
+		return errors.New("failed to update video")
 	}
 
 	// Thumbs
@@ -213,9 +217,11 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 		WebVtt:         savedVttFile,
 		WebVttImages:   strings.Join(imagesNames, ";"),
 	}
-	err = uc.UpdateVideo(movieUpdateRequest)
+	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
 		return err
+	} else if rowsAffected == 0 {
+		return errors.New("failed to update video")
 	}
 
 	return nil
@@ -276,16 +282,17 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 		Video720:    video720,
 		VideoShakal: videoShakal,
 	}
-	err := uc.UpdateVideo(movieUpdateRequest)
+	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
-		fmt.Println(err)
 		return err
+	} else if rowsAffected == 0 {
+		return errors.New("failed to update video")
 	}
 
 	return nil
 }
 
-func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) error {
+func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) (int64, error) {
 	movieRequest := NewVideoUpdateRequest(movie)
 	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code})
 }
@@ -323,10 +330,17 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		movieRequest.Preview = preview
 	}
 
-	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
+	rowsAffected, err := uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
+	if err != nil {
+		return err
+	} else if rowsAffected == 0 {
+		return errors.New("movie not found")
+	}
+
+	return nil
 }
 
-func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRequest) error {
+func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRequest) (int64, error) {
 	movieRequest := NewUpdatePublishStatusRequest(movie)
 	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
 }
