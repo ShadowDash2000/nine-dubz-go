@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type UseCase struct {
@@ -335,10 +336,10 @@ func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) (int64, error) {
 func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	movieRequest := NewUpdateRequest(movie)
 
-	if len(movie.Name) > 130 {
+	if utf8.RuneCountInString(movie.Name) > 130 {
 		return errors.New("movie name too long")
 	}
-	if len(movie.Description) > 5000 {
+	if utf8.RuneCountInString(movie.Description) > 5000 {
 		return errors.New("movie description too long")
 	}
 
