@@ -175,7 +175,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = h.MovieUseCase.UpdateByUserId(userId.(uint), movieUpdateRequest)
 	if err != nil {
-		http.Error(w, "Can't update movie", http.StatusBadRequest)
+		http.Error(w, "Can't update movie: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
