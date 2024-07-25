@@ -51,6 +51,24 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	tokenCookie, err := r.Cookie("token")
+	if err != nil {
+		response.RenderError(w, r, http.StatusUnauthorized, "Token cookie not found")
+		return
+	}
+	userId := r.Context().Value("userId").(uint)
+
+	err = h.TokenUseCase.Delete(userId, tokenCookie.Value)
+	if err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "Can't logout")
+		return
+	}
+
+	http.SetCookie(w, h.TokenAuthorize.GetEmptyTokenCookie())
+	response.RenderSuccess(w, r, http.StatusOK, "")
+}
+
 func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	registrationRequest := &RegistrationRequest{}
 	if err := json.NewDecoder(r.Body).Decode(registrationRequest); err != nil {

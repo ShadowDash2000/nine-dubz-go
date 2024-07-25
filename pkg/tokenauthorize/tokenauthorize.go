@@ -74,3 +74,18 @@ func (ta *TokenAuthorize) GetTokenCookie(subject string) (*http.Cookie, error) {
 
 	return &tokenCookie, nil
 }
+
+func (ta *TokenAuthorize) GetEmptyTokenCookie() *http.Cookie {
+	tokenCookie := http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Time{},
+		MaxAge:   0,
+		Secure:   false,
+		HttpOnly: false,
+		SameSite: http.SameSiteDefaultMode,
+	}
+
+	return &tokenCookie
+}

@@ -21,16 +21,26 @@ func (h *Handler) Routes(r chi.Router) {
 		})
 	})
 	r.
-		With(h.IsNotAuthorized).
 		Route("/authorize/inner", func(r chi.Router) {
-			r.Route("/register", func(r chi.Router) {
-				r.Post("/", h.RegisterHandler)
-			})
-			r.Route("/login", func(r chi.Router) {
-				r.Post("/", h.LoginHandler)
-			})
-			r.Route("/confirm", func(r chi.Router) {
-				r.Get("/", h.ConfirmRegistrationHandler)
-			})
+			r.
+				With(h.IsNotAuthorized).
+				Route("/register", func(r chi.Router) {
+					r.Post("/", h.RegisterHandler)
+				})
+			r.
+				With(h.IsNotAuthorized).
+				Route("/login", func(r chi.Router) {
+					r.Post("/", h.LoginHandler)
+				})
+			r.
+				With(h.IsAuthorized).
+				Route("/logout", func(r chi.Router) {
+					r.Get("/", h.LogoutHandler)
+				})
+			r.
+				With(h.IsNotAuthorized).
+				Route("/confirm", func(r chi.Router) {
+					r.Get("/", h.ConfirmRegistrationHandler)
+				})
 		})
 }
