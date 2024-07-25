@@ -38,11 +38,7 @@ func (h *Handler) AddCommentHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 
 	commentAddRequest := &AddRequest{}
 	if err := json.NewDecoder(r.Body).Decode(commentAddRequest); err != nil {
@@ -50,7 +46,7 @@ func (h *Handler) AddCommentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.CommentUseCase.Add(userId.(uint), movieCode, commentAddRequest.Text, uint(commentId))
+	err = h.CommentUseCase.Add(userId, movieCode, commentAddRequest.Text, uint(commentId))
 	if err != nil {
 		response.RenderError(w, r, http.StatusBadRequest, "Can't add comment")
 		return
@@ -61,13 +57,10 @@ func (h *Handler) AddCommentHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
-	userId := r.Context().Value("userId")
-	if userId == nil {
-		userId = uint(0)
-	}
+	userId := r.Context().Value("userId").(uint)
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
 
-	comments, err := h.CommentUseCase.GetMultiple(userId.(uint), movieCode, pagination)
+	comments, err := h.CommentUseCase.GetMultiple(userId, movieCode, pagination)
 	if err != nil {
 		response.RenderError(w, r, http.StatusBadRequest, "Can't get comments")
 		return
@@ -82,13 +75,9 @@ func (h *Handler) DeleteCommentHandler(w http.ResponseWriter, r *http.Request) {
 		response.RenderError(w, r, http.StatusBadRequest, "Invalid comment id")
 		return
 	}
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 
-	rowsAffected, err := h.CommentUseCase.Delete(uint(commentId), userId.(uint))
+	rowsAffected, err := h.CommentUseCase.Delete(uint(commentId), userId)
 	if err != nil || rowsAffected == 0 {
 		response.RenderError(w, r, http.StatusBadRequest, "Can't delete comment")
 		return

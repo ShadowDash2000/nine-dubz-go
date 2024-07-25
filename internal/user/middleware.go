@@ -47,7 +47,7 @@ func (h *Handler) TryToGetUserId(next http.Handler) http.Handler {
 
 		userId, err := h.TokenUseCase.GetUserIdByToken(tokenCookie.Value)
 		if err != nil {
-			next.ServeHTTP(w, r)
+			userId = 0
 			return
 		}
 

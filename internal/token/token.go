@@ -23,6 +23,17 @@ func (uc *UseCase) Add(userId uint, tokenString string) error {
 	return uc.TokenInteractor.Add(token)
 }
 
+func (uc *UseCase) Delete(userId uint, tokenString string) error {
+	rowsAffected, err := uc.TokenInteractor.Delete(userId, tokenString)
+	if err != nil {
+		return err
+	} else if rowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
 func (uc *UseCase) GetByUserId(userId uint) (*Token, error) {
 	return uc.TokenInteractor.GetByUserId(userId)
 }
