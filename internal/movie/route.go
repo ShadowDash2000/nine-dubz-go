@@ -5,7 +5,7 @@ import (
 	"nine-dubz/internal/pagination"
 )
 
-func (h *Handler) MovieRoutes(r chi.Router) {
+func (h *Handler) Routes(r chi.Router) {
 	r.Route("/movie", func(r chi.Router) {
 		r.
 			With(pagination.SetPaginationContextMiddleware).

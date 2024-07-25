@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 	"log"
 	"net/http"
+	"nine-dubz/internal/comment"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/googleoauth"
 	"nine-dubz/internal/mail"
@@ -47,6 +48,7 @@ func (app *App) Start() {
 	movuc := movie.New(app.DB, pool, fuc)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc)
+	cuc := comment.New(app.DB, movuc)
 
 	// JWT Token
 	tokenSecretKey, ok := os.LookupEnv("TOKEN_SECRET_KEY")
@@ -60,6 +62,7 @@ func (app *App) Start() {
 	fh := file.NewHandler(fuc)
 	mh := movie.NewHandler(movuc, uh, fuc, ta, tuc)
 	goah := googleoauth.NewHandler(goauc, uh, tuc, ta)
+	ch := comment.NewHandler(cuc, uh)
 
 	//app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.Recoverer)
@@ -102,8 +105,9 @@ func (app *App) Start() {
 	app.Router.Route("/api", func(r chi.Router) {
 		uh.Routes(r)
 		fh.Routes(r)
-		mh.MovieRoutes(r)
+		mh.Routes(r)
 		goah.Routes(r)
+		ch.Routes(r)
 	})
 
 	appIp, ok := os.LookupEnv("APP_IP")

@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"nine-dubz/internal/apimethod"
+	"nine-dubz/internal/comment"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/googleoauth"
 	"nine-dubz/internal/movie"
@@ -51,13 +52,14 @@ func NewGormDb() *gorm.DB {
 	}
 
 	db.AutoMigrate(
-		&movie.Movie{},
-		&user.User{},
+		&file.File{},
 		&role.Role{},
+		&user.User{},
 		&apimethod.ApiMethod{},
 		&token.Token{},
-		&file.File{},
 		&googleoauth.AuthorizeState{},
+		&movie.Movie{},
+		&comment.Comment{},
 	)
 
 	return db
