@@ -311,6 +311,7 @@ func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Requ
 
 func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
+	quality := r.URL.Query().Get("q")
 	requestRange := r.Header.Get("Range")
 	userId := r.Context().Value("userId")
 	if userId == nil {
@@ -323,7 +324,28 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(movie.Video.Name, requestRange)
+	file := movie.Video
+	switch quality {
+	case "0":
+		file = movie.VideoShakal
+		break
+	case "360":
+		file = movie.Video360
+		break
+	case "480":
+		file = movie.Video480
+		break
+	case "720":
+		file = movie.Video720
+		break
+	}
+
+	if file == nil {
+		http.Error(w, "No such quality", http.StatusNotFound)
+		return
+	}
+
+	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(file.Name, requestRange)
 	if err != nil {
 		http.Error(w, "File not found", http.StatusBadRequest)
 		return
