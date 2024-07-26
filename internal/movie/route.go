@@ -12,37 +12,30 @@ func (h *Handler) Routes(r chi.Router) {
 			Get("/", h.GetMultipleHandler)
 
 		r.
+			With(h.UserHandler.IsAuthorized).
+			With(h.UserHandler.UserPermission).
 			Route("/user", func(r chi.Router) {
-				r.
-					With(h.UserHandler.IsAuthorized).
-					With(h.UserHandler.UserPermission).
-					Route("/", func(r chi.Router) {
-						r.
-							With(pagination.SetPaginationContextMiddleware).
-							Get("/", h.GetMultipleForUserHandler)
-						r.Post("/", h.AddHandler)
-					})
-				r.
-					With(h.UserHandler.IsAuthorized).
-					With(h.UserHandler.UserPermission).
-					Route("/{movieCode}", func(r chi.Router) {
-						r.Delete("/", h.DeleteHandler)
-						r.Post("/", h.UpdateHandler)
-						r.Get("/", h.GetForUserHandler)
-					})
+				r.Route("/", func(r chi.Router) {
+					r.
+						With(pagination.SetPaginationContextMiddleware).
+						Get("/", h.GetMultipleForUserHandler)
+					r.Post("/", h.AddHandler)
+				})
+				r.Route("/{movieCode}", func(r chi.Router) {
+					r.Delete("/", h.DeleteHandler)
+					r.Post("/", h.UpdateHandler)
+					r.Get("/", h.GetForUserHandler)
+				})
 				r.Route("/upload", func(r chi.Router) {
 					r.Get("/", h.UploadVideoHandler)
 				})
-				r.
-					With(h.UserHandler.IsAuthorized).
-					With(h.UserHandler.UserPermission).
-					Route("/multiple", func(r chi.Router) {
-						r.Delete("/", h.DeleteMultipleHandler)
+				r.Route("/multiple", func(r chi.Router) {
+					r.Delete("/", h.DeleteMultipleHandler)
 
-						r.Route("/status", func(r chi.Router) {
-							r.Post("/", h.UpdatePublishStatusHandler)
-						})
+					r.Route("/status", func(r chi.Router) {
+						r.Post("/", h.UpdatePublishStatusHandler)
 					})
+				})
 			})
 
 		r.Route("/{movieCode}", func(r chi.Router) {
