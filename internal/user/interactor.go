@@ -3,7 +3,7 @@ package user
 import "nine-dubz/internal/role"
 
 type Interactor interface {
-	Add(user *User) uint
+	Add(user *User) (uint, error)
 	Remove(id uint) error
 	Save(user *User) error
 	Updates(user *User) error

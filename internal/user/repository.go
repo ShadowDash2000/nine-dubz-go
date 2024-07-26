@@ -9,20 +9,20 @@ type Repository struct {
 	DB *gorm.DB
 }
 
-func (r *Repository) Add(user *User) uint {
+func (r *Repository) Add(user *User) (uint, error) {
 	roleStruct := &role.Role{}
 	result := r.DB.First(&roleStruct, "code = ?", "all")
 	if result.Error != nil {
-		return 0
+		return 0, result.Error
 	}
 	user.Roles = []role.Role{*roleStruct}
 
 	result = r.DB.Create(&user)
 	if result.Error != nil {
-		return 0
+		return 0, result.Error
 	}
 
-	return user.ID
+	return user.ID, nil
 }
 
 func (r *Repository) Remove(id uint) error {

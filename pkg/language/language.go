@@ -27,7 +27,7 @@ func GetLanguage(languageCode string) (*Language, error) {
 
 	entries, err := os.ReadDir(languagePath)
 	if err != nil {
-		return nil, errors.New("no language directory")
+		return nil, errors.New("language: no language directory")
 	}
 
 	var language *Language
@@ -57,6 +57,10 @@ func GetLanguage(languageCode string) (*Language, error) {
 		fileContent.Close()
 	}
 
+	if language == nil {
+		return nil, errors.New("language: no language file")
+	}
+
 	return language, nil
 }
 
@@ -76,7 +80,9 @@ func GetPath() string {
 func GetMessage(messageCode, languageCode string) (string, error) {
 	language, err := GetLanguage(languageCode)
 	if err != nil {
-		return "", errors.New("language not found")
+		return "", errors.New("language: language not found")
+	} else if language.Messages == nil {
+		return "", errors.New("language: no language messages")
 	}
 
 	messageIndex := slices.IndexFunc(language.Messages, func(m Message) bool {
@@ -84,7 +90,7 @@ func GetMessage(messageCode, languageCode string) (string, error) {
 	})
 
 	if messageIndex == -1 {
-		return "", errors.New("message not found")
+		return "", errors.New("language: message not found")
 	}
 
 	return language.Messages[messageIndex].Text, nil

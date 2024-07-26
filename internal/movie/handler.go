@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
+	"nine-dubz/internal/response"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/pkg/tokenauthorize"
@@ -36,7 +37,7 @@ func NewHandler(uc *UseCase, uh *user.Handler, fuc *file.UseCase, ta *tokenautho
 func (h *Handler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
@@ -45,7 +46,7 @@ func (h *Handler) AddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	movieAddResponse, err := h.MovieUseCase.Add(movieAddRequest)
 	if err != nil {
-		http.Error(w, "Can't add movie", http.StatusInternalServerError)
+		response.RenderError(w, r, http.StatusInternalServerError, "Can't add movie")
 		return
 	}
 
@@ -55,7 +56,7 @@ func (h *Handler) AddHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.FileUseCase.UpgradeConnection(w, r)
 	if err != nil {
-		http.Error(w, "Can't upgrade connection", http.StatusInternalServerError)
+		response.RenderError(w, r, http.StatusInternalServerError, "Can't upgrade connection")
 		return
 	}
 	defer conn.Close()
@@ -148,12 +149,12 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	if err := r.ParseMultipartForm(6 << 20); err != nil {
-		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Failed to parse form data")
 		return
 	}
 
@@ -175,7 +176,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = h.MovieUseCase.UpdateByUserId(userId.(uint), movieUpdateRequest)
 	if err != nil {
-		http.Error(w, "Can't update movie: "+err.Error(), http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Can't update movie: "+err.Error())
 		return
 	}
 
@@ -193,7 +194,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	movie, err := h.MovieUseCase.Get(userId.(uint), movieCode)
 	if err != nil {
-		http.Error(w, "Movie not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
 
@@ -209,7 +210,7 @@ func (h *Handler) GetForUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	movie, err := h.MovieUseCase.GetForUser(userId.(uint), movieCode)
 	if err != nil {
-		http.Error(w, "Movie not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
 
@@ -219,7 +220,7 @@ func (h *Handler) GetForUserHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetMultipleForUserHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
@@ -260,51 +261,55 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 	movieCode := chi.URLParam(r, "movieCode")
 
 	if err := h.MovieUseCase.Delete(userId.(uint), movieCode); err != nil {
-		http.Error(w, "Movie not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
+
+	response.RenderSuccess(w, r, http.StatusOK, "")
 }
 
 func (h *Handler) DeleteMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	moviesDeleteRequest := &[]DeleteRequest{}
 	if err := json.NewDecoder(r.Body).Decode(moviesDeleteRequest); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Can't parse fields")
 		return
 	}
 
 	if err := h.MovieUseCase.DeleteMultiple(userId.(uint), moviesDeleteRequest); err != nil {
-		http.Error(w, "Movie not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 	}
+
+	response.RenderSuccess(w, r, http.StatusOK, "")
 }
 
 func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId")
 	if userId == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	movieUpdatePublishStatusRequest := &UpdatePublishStatusRequest{}
 	if err := json.NewDecoder(r.Body).Decode(movieUpdatePublishStatusRequest); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Can't parse fields")
 		return
 	}
 
 	rowsAffected, err := h.MovieUseCase.UpdatePublishStatus(userId.(uint), movieUpdatePublishStatusRequest)
 	if err != nil || rowsAffected == 0 {
-		http.Error(w, "Movie not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
 }
@@ -320,7 +325,7 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 
 	movie, err := h.MovieUseCase.CheckMovieAccess(userId.(uint), movieCode)
 	if err != nil {
-		http.Error(w, "Movie not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
 
@@ -341,13 +346,13 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if file == nil {
-		http.Error(w, "No such quality", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "No such quality")
 		return
 	}
 
 	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(file.Name, requestRange)
 	if err != nil {
-		http.Error(w, "File not found", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusNotFound, "File not found")
 		return
 	}
 

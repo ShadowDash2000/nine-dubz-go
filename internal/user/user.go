@@ -36,7 +36,7 @@ func New(db *gorm.DB, tuc *token.UseCase, ruc *role.UseCase, fuc *file.UseCase, 
 	}
 }
 
-func (uc *UseCase) Add(user *User) uint {
+func (uc *UseCase) Add(user *User) (uint, error) {
 	user.Hash = helper.Hash([]byte(user.Name + user.Email + user.Password + time.Now().String()))
 
 	return uc.UserInteractor.Add(user)
@@ -68,12 +68,14 @@ func (uc *UseCase) Register(user *User) (uint, error) {
 
 	user.Hash = helper.Hash([]byte(user.Name + user.Email + user.Password + time.Now().String()))
 	user.Password = helper.HashPassword(user.Password)
-	userId := uc.UserInteractor.Add(user)
-	if userId > 0 {
-		return userId, nil
-	} else {
+	userId, err := uc.UserInteractor.Add(user)
+	if err != nil {
 		return 0, errors.New("REGISTRATION_ALREADY_EXIST")
+	} else if userId > 0 {
+		return userId, nil
 	}
+
+	return 0, errors.New("REGISTRATION_INTERNAL_ERROR")
 }
 
 func (uc *UseCase) CheckUserWithNameExists(userName string) bool {

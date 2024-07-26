@@ -3,6 +3,7 @@ package file
 import (
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"nine-dubz/internal/response"
 )
 
 type Handler struct {
@@ -19,7 +20,7 @@ func (h *Handler) GetFile(w http.ResponseWriter, r *http.Request) {
 
 	buff, err := h.FileUseCase.GetFile(fileName)
 	if err != nil {
-		http.Error(w, "No such file", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusNotFound, "No such file")
 		return
 	}
 

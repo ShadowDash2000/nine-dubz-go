@@ -3,6 +3,7 @@ package googleoauth
 import (
 	"github.com/go-chi/render"
 	"net/http"
+	"nine-dubz/internal/response"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/pkg/tokenauthorize"
@@ -70,8 +71,11 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 		Email: googleUser.Email,
 	}
 
-	userId = h.GoogleOAuthUseCase.Register(registrationRequest)
-	if userId > 0 {
+	userId, err = h.GoogleOAuthUseCase.Register(registrationRequest)
+	if err != nil {
+		response.RenderError(w, r, http.StatusInternalServerError, "")
+		return
+	} else if userId > 0 {
 		tokenCookie, err := h.TokenAuthorize.GetTokenCookie(loginRequest.Email)
 		if err != nil {
 			return
@@ -84,4 +88,6 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
+
+	response.RenderError(w, r, http.StatusInternalServerError, "")
 }
