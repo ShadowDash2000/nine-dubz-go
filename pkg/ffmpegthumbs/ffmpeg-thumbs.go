@@ -127,6 +127,7 @@ func Resize(height int, crf, speed, bitrate, filePath, outputPath, fileName stri
 			"c:a":   "libopus",
 		}).
 		Silent(true).
+		OverWriteOutput().
 		Run()
 	if err != nil {
 		fmt.Println(err)
@@ -152,6 +153,7 @@ func ToWebm(filePath, crf, speed, bitrate, outputPath, fileName string) error {
 			"c:a":   "libopus",
 		}).
 		Silent(true).
+		OverWriteOutput().
 		Run()
 	if err != nil {
 		return err

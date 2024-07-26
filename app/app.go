@@ -121,6 +121,9 @@ func (app *App) Start() {
 
 	fmt.Println(fmt.Sprintf("Starting server at: %s:%s", appIp, appPort))
 
+	// If server were crashed, try to re-post-process them
+	movuc.RetryVideoPostProcess()
+
 	err := http.ListenAndServe(appIp+":"+appPort, app.Router)
 	if err != nil {
 		return

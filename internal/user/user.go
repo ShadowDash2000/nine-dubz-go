@@ -51,10 +51,6 @@ func (uc *UseCase) LoginWOPassword(user *User) uint {
 	return uc.UserInteractor.LoginWOPassword(user)
 }
 
-func (uc *UseCase) Logout() {
-
-}
-
 func (uc *UseCase) Register(user *User) (uint, error) {
 	if ok := helper.ValidateUserName(user.Name); !ok {
 		return 0, errors.New("REGISTRATION_INVALID_USER_NAME")

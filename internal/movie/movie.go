@@ -130,6 +130,27 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 		return err
 	}
 
+	tmpFile, err = os.Open(tmpFile.Name())
+	if err != nil {
+		return errors.New("failed to open file tmp file")
+	}
+
+	tmpSavedFile, err := uc.FileUseCase.SaveFile(tmpFile, tmpFile.Name(), int64(header.Size), "private")
+	if err != nil {
+		return err
+	}
+	tmpFile.Close()
+
+	movieUpdateRequest = &VideoUpdateRequest{
+		Code:     header.MovieCode,
+		VideoTmp: tmpSavedFile,
+	}
+	rowsAffected, err = uc.UpdateVideo(movieUpdateRequest)
+	if err != nil || rowsAffected == 0 {
+		uc.DeleteMovieFiles(NewVideoUpdateRequest(movieUpdateRequest))
+		return errors.New("failed to update tmp video")
+	}
+
 	uc.Pool.Submit(func() {
 		uc.PostProcessVideo(header, tmpFile)
 	})
@@ -137,23 +158,60 @@ func (uc *UseCase) SaveVideo(userId uint, header *VideoUploadHeader, conn *webso
 	return nil
 }
 
-func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File) error {
+func (uc *UseCase) RetryVideoPostProcess() {
+	movies, err := uc.MovieInteractor.GetWhereMultiple(&pagination.Pagination{
+		Limit:  -1,
+		Offset: -1,
+	}, map[string]interface{}{"status": "uploading"})
+	if err != nil {
+		return
+	}
+
+	for _, movie := range *movies {
+		if movie.VideoTmp == nil {
+			uc.Delete(movie.UserId, movie.Code)
+			continue
+		}
+		tmpFile, err := os.Open(movie.VideoTmp.OriginalName)
+		if err != nil {
+			uc.Delete(movie.UserId, movie.Code)
+			continue
+		}
+
+		header := &VideoUploadHeader{
+			MovieCode: movie.Code,
+		}
+
+		uc.Pool.Submit(func() {
+			uc.PostProcessVideo(header, tmpFile, movie)
+		})
+	}
+}
+
+func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File, movies ...Movie) error {
+	movie := &Movie{}
+	if len(movies) == 1 {
+		movie = &movies[0]
+	}
+
 	resizedVideoPath := filepath.Join("upload/resize", header.MovieCode)
 	thumbsPath := filepath.Join("upload/thumbs/", header.MovieCode)
 
-	bitrate, err := ffmpegthumbs.GetVideoBitrate(tmpFile.Name())
-	if err != nil || bitrate <= 0 {
-		bitrate = 30000
-	}
+	if movie.Video == nil {
+		bitrate, err := ffmpegthumbs.GetVideoBitrate(tmpFile.Name())
+		if err != nil || bitrate <= 0 {
+			bitrate = 30000
+		}
 
-	ffmpegthumbs.ToWebm(tmpFile.Name(), "31", "1", strconv.Itoa(bitrate), resizedVideoPath, "orig")
+		ffmpegthumbs.ToWebm(tmpFile.Name(), "31", "1", strconv.Itoa(bitrate), resizedVideoPath, "orig")
+	}
 
 	origWebmPath := filepath.Join(resizedVideoPath, "orig.webm")
 	origWebm, err := os.Open(origWebmPath)
 	if err != nil {
 		return err
 	}
-	origWebmInfo, _ := os.Stat(tmpFile.Name())
+	origWebmInfo, _ := os.Stat(origWebm.Name())
 
 	defer os.RemoveAll(resizedVideoPath)
 	defer os.RemoveAll(thumbsPath)
@@ -176,18 +234,24 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File)
 		return errors.New("failed to update video")
 	}
 
-	// Thumbs
-	uc.CreateThumbnails(thumbsPath, header, tmpFile)
+	if movie.WebVtt == nil {
+		// Thumbs
+		uc.CreateThumbnails(thumbsPath, header, tmpFile)
+	}
 
 	// Resize
-	uc.CreateResizedVideos(origWebmPath, resizedVideoPath, header, tmpFile)
+	uc.CreateResizedVideos(origWebmPath, resizedVideoPath, header, tmpFile, *movie)
 
 	// Check if movie was deleted while post-processing
-	movie, err := uc.MovieInteractor.Get(header.MovieCode)
+	movie, err = uc.MovieInteractor.Get(header.MovieCode)
 	if err == nil {
 		if movie.DeletedAt.Valid {
 			uc.DeleteMovieFiles(movie)
 			return errors.New("movie was deleted while post-processing")
+		}
+
+		if movie.VideoTmp != nil {
+			uc.FileUseCase.RemoveFile(movie.VideoTmp.Name)
 		}
 	}
 
@@ -251,15 +315,20 @@ func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader
 	return nil
 }
 
-func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, header *VideoUploadHeader, tmpFile *os.File) error {
+func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, header *VideoUploadHeader, tmpFile *os.File, movies ...Movie) error {
 	var videoShakal *file.File
 	var video360 *file.File
 	var video480 *file.File
 	var video720 *file.File
 
+	movie := &Movie{}
+	if len(movies) == 1 {
+		movie = &movies[0]
+	}
+
 	_, videoHeight, _ := ffmpegthumbs.GetVideoSize(origWebmPath)
 	// 0P
-	if videoHeight > 0 {
+	if videoHeight > 0 && movie.VideoShakal == nil {
 		ffmpegthumbs.Resize(240, "50", "5", "5", tmpFile.Name(), resizedVideoPath, "shakal")
 		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "shakal.webm"))
 		if err == nil {
@@ -272,7 +341,7 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 		}
 	}
 	// 360p
-	if videoHeight > 360 {
+	if videoHeight > 360 && movie.Video360 == nil {
 		ffmpegthumbs.Resize(360, "33", "3", "900k", tmpFile.Name(), resizedVideoPath, "360")
 		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "360.webm"))
 		if err == nil {
@@ -285,7 +354,7 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 		}
 	}
 	// 480p
-	if videoHeight > 480 {
+	if videoHeight > 480 && movie.Video480 == nil {
 		ffmpegthumbs.Resize(480, "33", "3", "1000k", tmpFile.Name(), resizedVideoPath, "480")
 		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "480.webm"))
 		if err == nil {
@@ -298,7 +367,7 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 		}
 	}
 	// 720p
-	if videoHeight > 720 {
+	if videoHeight > 720 && movie.Video720 == nil {
 		ffmpegthumbs.Resize(720, "32", "2", "1800k", tmpFile.Name(), resizedVideoPath, "720")
 		resizedWebm, err := os.Open(filepath.Join(resizedVideoPath, "720.webm"))
 		if err == nil {
@@ -312,6 +381,7 @@ func (uc *UseCase) CreateResizedVideos(origWebmPath, resizedVideoPath string, he
 	}
 
 	movieUpdateRequest := &VideoUpdateRequest{
+		Status:      "ready",
 		Code:        header.MovieCode,
 		Video360:    video360,
 		Video480:    video480,
