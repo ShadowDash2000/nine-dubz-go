@@ -42,6 +42,7 @@ func (mr *Repository) UpdatesWhere(movie *Movie, where map[string]interface{}) (
 func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
+		Preload("VideoTmp").
 		Preload("Video").
 		Preload("VideoShakal").
 		Preload("Video360").
@@ -126,6 +127,28 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination) (*[]Movie, 
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Where("is_published = 1").
+		Find(&movies)
+
+	return movies, result.Error
+}
+
+func (mr *Repository) GetWhereMultiple(pagination *pagination.Pagination, where map[string]interface{}) (*[]Movie, error) {
+	movies := &[]Movie{}
+	result := mr.DB.
+		Preload("VideoTmp").
+		Preload("Video").
+		Preload("VideoShakal").
+		Preload("Video360").
+		Preload("Video480").
+		Preload("Video720").
+		Preload("Preview").
+		Preload("DefaultPreview").
+		Preload("WebVtt").
+		Preload("User").
+		Preload("User.Picture").
+		Limit(pagination.Limit).
+		Offset(pagination.Offset).
+		Where(where).
 		Find(&movies)
 
 	return movies, result.Error

@@ -11,6 +11,7 @@ import (
 type Movie struct {
 	gorm.Model
 	ID               uint       `json:"ID"`
+	Status           string     `json:"-" gorm:"default:'uploading'"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	Code             string     `json:"code"`
 	IsPublished      bool       `json:"-" gorm:"default:false"`
@@ -20,6 +21,8 @@ type Movie struct {
 	DefaultPreviewId *uint      `json:"-"`
 	DefaultPreview   *file.File `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
 	Name             string     `json:"name"`
+	VideoTmpId       *uint      `json:"-"`
+	VideoTmp         *file.File `json:"-" gorm:"foreignKey:VideoTmpId;references:ID;"`
 	VideoId          *uint      `json:"-"`
 	Video            *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
 	VideoShakalId    *uint      `json:"-"`
@@ -125,8 +128,10 @@ func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 }
 
 type VideoUpdateRequest struct {
+	Status         string     `json:"-"`
 	Name           string     `json:"name"`
 	Code           string     `json:"code"`
+	VideoTmp       *file.File `json:"-"`
 	Video          *file.File `json:"video"`
 	VideoShakal    *file.File `json:"videoShakal"`
 	Video360       *file.File `json:"video360"`
@@ -139,8 +144,10 @@ type VideoUpdateRequest struct {
 
 func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 	return &Movie{
+		Status:         movie.Status,
 		Name:           movie.Name,
 		Code:           movie.Code,
+		VideoTmp:       movie.VideoTmp,
 		Video:          movie.Video,
 		VideoShakal:    movie.VideoShakal,
 		Video360:       movie.Video360,
