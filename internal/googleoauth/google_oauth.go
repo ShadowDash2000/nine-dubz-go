@@ -57,7 +57,7 @@ func (uc *UseCase) Login(loginRequest *UserLoginRequest) uint {
 	return uc.UserUseCase.LoginWOPassword(loginPayload)
 }
 
-func (uc *UseCase) Register(registrationRequest *UserRegistrationRequest) uint {
+func (uc *UseCase) Register(registrationRequest *UserRegistrationRequest) (uint, error) {
 	registrationPayload := NewUserRegistrationRequest(registrationRequest)
 	registrationPayload.Active = true
 

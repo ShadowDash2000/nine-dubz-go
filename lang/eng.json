@@ -18,6 +18,14 @@
       "text": "Invalid password"
     },
     {
+      "code": "REGISTRATION_INVALID_FIELDS",
+      "text": "Invalid fields"
+    },
+    {
+      "code": "REGISTRATION_INTERNAL_ERROR",
+      "text": "Internal error"
+    },
+    {
       "code": "LOGIN_USER_NOT_FOUND",
       "text": "User not found"
     },

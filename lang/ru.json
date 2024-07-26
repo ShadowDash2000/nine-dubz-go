@@ -1,6 +1,6 @@
 {
   "code": "ru",
-  "strings": [
+  "messages": [
     {
       "code": "REGISTRATION_ALREADY_EXIST",
       "text": "Пользователь с таким email уже существует"
@@ -16,6 +16,14 @@
     {
       "code": "REGISTRATION_INVALID_PASSWORD",
       "text": "Некорректный пароль"
+    },
+    {
+      "code": "REGISTRATION_INVALID_FIELDS",
+      "text": "Некорректные поля"
+    },
+    {
+      "code": "REGISTRATION_INTERNAL_ERROR",
+      "text": "Внутренняя ошибка"
     },
     {
       "code": "LOGIN_USER_NOT_FOUND",

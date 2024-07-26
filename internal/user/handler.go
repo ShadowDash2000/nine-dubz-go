@@ -46,9 +46,10 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, tokenCookie)
 
 		response.RenderSuccess(w, r, http.StatusOK, "")
-	} else {
-		response.RenderError(w, r, http.StatusBadRequest, "LOGIN_USER_NOT_FOUND")
+		return
 	}
+
+	response.RenderError(w, r, http.StatusBadRequest, "LOGIN_USER_NOT_FOUND")
 }
 
 func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +73,7 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	registrationRequest := &RegistrationRequest{}
 	if err := json.NewDecoder(r.Body).Decode(registrationRequest); err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "REGISTRATION_INVALID_FIELDS")
 		return
 	}
 
@@ -80,19 +82,20 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.RenderError(w, r, http.StatusBadRequest, err.Error())
 		return
-	}
-
-	if userId > 0 {
+	} else if userId > 0 {
 		h.SendRegistrationEmail(r, registrationPayload)
 
 		response.RenderSuccess(w, r, http.StatusOK, "")
+		return
 	}
+
+	response.RenderError(w, r, http.StatusInternalServerError, "REGISTRATION_INTERNAL_ERROR")
 }
 
 func (h *Handler) SendRegistrationEmail(r *http.Request, user *User) {
 	languageCode := language.GetLanguageCode(r)
 
-	subject, _ := language.GetMessage(languageCode, "EMAIL_REGISTRATION_CONFIRMATION")
+	subject, _ := language.GetMessage("EMAIL_REGISTRATION_CONFIRMATION", languageCode)
 	link := fmt.Sprintf("%s/api/authorize/inner/confirm/?email=%s&hash=%s", "https://"+r.Host, user.Email, user.Hash)
 	contentValues := map[string]string{"userName": user.Name, "link": link}
 	content, _ := language.GetFormattedMessage("EMAIL_REGISTRATION_CONFIRMATION_CONTENT", contentValues, languageCode)
@@ -122,7 +125,7 @@ func (h *Handler) GetUserShortHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.UserUseCase.GetById(userId)
 	if err != nil {
-		http.Error(w, "user not found", http.StatusNotFound)
+		response.RenderError(w, r, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -133,13 +136,13 @@ func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Requ
 	email := r.URL.Query().Get("email")
 	hash := r.URL.Query().Get("hash")
 	if email == "" || hash == "" {
-		http.Error(w, "Missing email or hash", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Missing email or hash")
 		return
 	}
 
 	userId, ok := h.UserUseCase.ConfirmRegistration(email, hash)
 	if !ok {
-		http.Error(w, "Can't confirm registration", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Can't confirm registration")
 		return
 	}
 
@@ -157,19 +160,19 @@ func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Requ
 
 func (h *Handler) UpdatePictureHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Failed to parse form data")
 		return
 	}
 
 	file, fileHeader, err := r.FormFile("picture")
 	if err != nil {
-		http.Error(w, "No picture file", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "No picture file")
 		return
 	}
 
 	userId := r.Context().Value("userId").(uint)
 	if err = h.UserUseCase.UpdatePicture(userId, file, fileHeader); err != nil {
-		http.Error(w, "Failed to update picture", http.StatusBadRequest)
+		response.RenderError(w, r, http.StatusBadRequest, "Failed to update picture")
 		return
 	}
 }
