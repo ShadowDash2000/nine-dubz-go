@@ -4,24 +4,25 @@ import (
 	"context"
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"nine-dubz/internal/response"
 )
 
 func (h *Handler) IsAuthorized(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenCookie, err := r.Cookie("token")
 		if err != nil {
-			http.Error(w, "Token cookie not found", http.StatusUnauthorized)
+			response.RenderError(w, r, http.StatusUnauthorized, "Token cookie not found")
 			return
 		}
 
 		if _, err = h.TokenAuthorize.VerifyToken(tokenCookie.Value); err != nil {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			response.RenderError(w, r, http.StatusUnauthorized, "Invalid token")
 			return
 		}
 
 		userId, err := h.TokenUseCase.GetUserIdByToken(tokenCookie.Value)
 		if err != nil {
-			http.Error(w, "User not found", http.StatusUnauthorized)
+			response.RenderError(w, r, http.StatusUnauthorized, "User not found")
 			return
 		}
 
@@ -63,7 +64,7 @@ func (h *Handler) IsNotAuthorized(next http.Handler) http.Handler {
 		tokenCookie, err := r.Cookie("token")
 		if err == nil {
 			if _, err = h.TokenAuthorize.VerifyToken(tokenCookie.Value); err == nil {
-				http.Error(w, "You're authorized already", http.StatusUnauthorized)
+				response.RenderError(w, r, http.StatusUnauthorized, "You're authorized already")
 				return
 			}
 		}
@@ -83,7 +84,7 @@ func (h *Handler) UserPermission(next http.Handler) http.Handler {
 		method := r.Method
 
 		if ok := h.UserUseCase.CheckUserPermission(userId.(uint), routePattern, method); !ok {
-			http.Error(w, "Permission denied", http.StatusForbidden)
+			response.RenderError(w, r, http.StatusForbidden, "Permission denied")
 			return
 		}
 
