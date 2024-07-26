@@ -70,7 +70,10 @@ func (uc *UseCase) Register(user *User) (uint, error) {
 	user.Password = helper.HashPassword(user.Password)
 	userId, err := uc.UserInteractor.Add(user)
 	if err != nil {
-		return 0, errors.New("REGISTRATION_ALREADY_EXIST")
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return 0, errors.New("REGISTRATION_ALREADY_EXIST")
+		}
+		return 0, errors.New("REGISTRATION_INTERNAL_ERROR")
 	} else if userId > 0 {
 		return userId, nil
 	}
