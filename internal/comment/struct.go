@@ -9,13 +9,14 @@ import (
 
 type Comment struct {
 	gorm.Model
-	Text     string      `json:"text"`
-	MovieID  uint        `json:"-"`
-	Movie    movie.Movie `json:"-"`
-	UserID   uint        `json:"-"`
-	User     user.User   `json:"user"`
-	ParentID *uint       `json:"-"`
-	Parent   *Comment    `json:"parent,omitempty"`
+	Text        string
+	MovieID     uint `gorm:"not null"`
+	Movie       movie.Movie
+	UserID      uint `gorm:"not null"`
+	User        user.User
+	ParentID    *uint
+	Parent      *Comment
+	SubComments []Comment `gorm:"foreignKey:ParentID"`
 }
 
 type AddRequest struct {
@@ -23,20 +24,19 @@ type AddRequest struct {
 }
 
 type GetResponse struct {
-	CreatedAt time.Time               `json:"createdAt"`
-	Text      string                  `json:"text"`
-	User      *user.GetPublicResponse `json:"user"`
-	Parent    *GetResponse            `json:"parent,omitempty"`
+	CreatedAt   time.Time               `json:"createdAt"`
+	Text        string                  `json:"text"`
+	User        *user.GetPublicResponse `json:"user"`
+	Parent      *GetResponse            `json:"-"`
+	SubComments []GetResponse           `json:"subComments,omitempty"`
 }
 
 func NewGetResponse(comment *Comment) *GetResponse {
 	response := &GetResponse{
-		CreatedAt: comment.CreatedAt,
-		Text:      comment.Text,
-		User:      user.NewGetPublicResponse(&comment.User),
-	}
-	if comment.Parent != nil {
-		response.Parent = NewGetResponse(comment.Parent)
+		CreatedAt:   comment.CreatedAt,
+		Text:        comment.Text,
+		User:        user.NewGetPublicResponse(&comment.User),
+		SubComments: *NewGetMultipleResponse(&comment.SubComments),
 	}
 
 	return response

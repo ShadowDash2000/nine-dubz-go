@@ -15,30 +15,44 @@ func (r *Repository) Create(comment *Comment) error {
 	return result.Error
 }
 
-func (r *Repository) Get(commentId uint) (*Comment, error) {
+func (r *Repository) Get(where map[string]interface{}, order, orderSub string, paginationSub *pagination.Pagination) (*Comment, error) {
 	comment := &Comment{}
 	result := r.DB.
 		Preload("Parent").
-		Preload("Parent.User").
-		Preload("Parent.User.Picture").
 		Preload("User").
 		Preload("User.Picture").
-		First(comment, commentId)
+		Preload("SubComments", func(db *gorm.DB) *gorm.DB {
+			return db.
+				Order(orderSub).
+				Limit(paginationSub.Limit).
+				Offset(paginationSub.Offset)
+		}).
+		Preload("SubComments.User").
+		Preload("SubComments.User.Picture").
+		Where(where).
+		Order(order).
+		First(comment)
 
 	return comment, result.Error
 }
 
-func (r *Repository) GetMultiple(where map[string]interface{}, pagination *pagination.Pagination) (*[]Comment, error) {
+func (r *Repository) GetMultiple(where map[string]interface{}, order, orderSub string, pagination, paginationSub *pagination.Pagination) (*[]Comment, error) {
 	var comments []Comment
 	result := r.DB.
-		Preload("Parent").
-		Preload("Parent.User").
-		Preload("Parent.User.Picture").
 		Preload("User").
 		Preload("User.Picture").
+		Preload("SubComments", func(db *gorm.DB) *gorm.DB {
+			return db.
+				Order(orderSub).
+				Limit(paginationSub.Limit).
+				Offset(paginationSub.Offset)
+		}).
+		Preload("SubComments.User").
+		Preload("SubComments.User.Picture").
 		Where(where).
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
+		Order(order).
 		Find(&comments)
 
 	return &comments, result.Error

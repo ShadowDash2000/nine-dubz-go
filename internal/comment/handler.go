@@ -55,6 +55,32 @@ func (h *Handler) AddCommentHandler(w http.ResponseWriter, r *http.Request) {
 	response.RenderSuccess(w, r, http.StatusOK, "")
 }
 
+func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
+	movieCode := chi.URLParam(r, "movieCode")
+	userId := r.Context().Value("userId").(uint)
+	subPagination := r.Context().Value("pagination").(*pagination.Pagination)
+
+	var commentId uint64
+	var err error
+	commentId = 0
+	commentIdParam := chi.URLParam(r, "commentId")
+	if commentIdParam != "" {
+		commentId, err = strconv.ParseUint(commentIdParam, 10, 32)
+		if err != nil {
+			response.RenderError(w, r, http.StatusBadRequest, "Failed to parse comment id")
+			return
+		}
+	}
+
+	comments, err := h.CommentUseCase.Get(userId, movieCode, uint(commentId), subPagination)
+	if err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "Can't get comments")
+		return
+	}
+
+	render.JSON(w, r, comments)
+}
+
 func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
 	userId := r.Context().Value("userId").(uint)
