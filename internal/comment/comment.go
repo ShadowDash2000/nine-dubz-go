@@ -28,6 +28,10 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 		parentCommentId = options[0]
 	}
 
+	if utf8.RuneCountInString(text) == 0 {
+		return errors.New("comment text too short")
+	}
+
 	if utf8.RuneCountInString(text) > 5000 {
 		return errors.New("comment text too long")
 	}
@@ -44,7 +48,15 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 	}
 
 	if parentCommentId > 0 {
-		parentComment, err := uc.Get(parentCommentId)
+		parentComment, err := uc.CommentInteractor.Get(
+			map[string]interface{}{"id": parentCommentId},
+			"",
+			"",
+			&pagination.Pagination{
+				Limit:  0,
+				Offset: 0,
+			},
+		)
 		if err != nil {
 			return err
 		} else if parentComment.Parent != nil {
@@ -57,18 +69,9 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 	return uc.CommentInteractor.Create(comment)
 }
 
-func (uc *UseCase) Get(commentId uint) (*GetResponse, error) {
-	comment, err := uc.CommentInteractor.Get(commentId)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewGetResponse(comment), nil
-}
-
-func (uc *UseCase) GetMultiple(userId uint, movieCode string, pagination *pagination.Pagination) (*[]GetResponse, error) {
-	if pagination.Limit > 20 {
-		pagination.Limit = 20
+func (uc *UseCase) Get(userId uint, movieCode string, commentId uint, paginationSub *pagination.Pagination) (*GetResponse, error) {
+	if paginationSub.Limit > 10 {
+		paginationSub.Limit = 10
 	}
 
 	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
@@ -76,9 +79,46 @@ func (uc *UseCase) GetMultiple(userId uint, movieCode string, pagination *pagina
 		return nil, err
 	}
 
-	comments, err := uc.CommentInteractor.GetMultiple(map[string]interface{}{
-		"movie_id": movieResponse.ID,
-	}, pagination)
+	comment, err := uc.CommentInteractor.Get(
+		map[string]interface{}{
+			"id":        commentId,
+			"movie_id":  movieResponse.ID,
+			"parent_id": nil,
+		},
+		"created_at desc",
+		"created_at asc",
+		paginationSub,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewGetResponse(comment), nil
+}
+
+func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pagination.Pagination) (*[]GetResponse, error) {
+	if paginationMain.Limit > 20 {
+		paginationMain.Limit = 20
+	}
+
+	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
+	if err != nil {
+		return nil, err
+	}
+
+	comments, err := uc.CommentInteractor.GetMultiple(
+		map[string]interface{}{
+			"movie_id":  movieResponse.ID,
+			"parent_id": nil,
+		},
+		"created_at desc",
+		"created_at asc",
+		paginationMain,
+		&pagination.Pagination{
+			Limit:  10,
+			Offset: 0,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

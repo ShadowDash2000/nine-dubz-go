@@ -21,6 +21,10 @@ func (h *Handler) Routes(r chi.Router) {
 					With(h.UserHandler.IsAuthorized).
 					Route("/{commentId}", func(r chi.Router) {
 						r.Post("/", h.AddCommentHandler)
+						r.
+							With(pagination.SetPaginationContextMiddleware).
+							With(h.UserHandler.TryToGetUserId).
+							Get("/", h.GetHandler)
 						r.Delete("/", h.DeleteCommentHandler)
 					})
 			})
