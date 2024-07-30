@@ -69,9 +69,9 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 	return uc.CommentInteractor.Create(comment)
 }
 
-func (uc *UseCase) Get(userId uint, movieCode string, commentId uint, paginationSub *pagination.Pagination) (*GetResponse, error) {
-	if paginationSub.Limit > 10 {
-		paginationSub.Limit = 10
+func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentId uint, paginationMain *pagination.Pagination) (*[]GetSubCommentResponse, error) {
+	if paginationMain.Limit > 10 {
+		paginationMain.Limit = 10
 	}
 
 	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
@@ -79,24 +79,27 @@ func (uc *UseCase) Get(userId uint, movieCode string, commentId uint, pagination
 		return nil, err
 	}
 
-	comment, err := uc.CommentInteractor.Get(
+	comments, err := uc.CommentInteractor.GetMultiple(
 		map[string]interface{}{
-			"id":        commentId,
 			"movie_id":  movieResponse.ID,
-			"parent_id": nil,
+			"parent_id": parentId,
 		},
-		"created_at desc",
 		"created_at asc",
-		paginationSub,
+		"",
+		paginationMain,
+		&pagination.Pagination{
+			Limit:  -1,
+			Offset: -1,
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewGetResponse(comment), nil
+	return NewGetMultipleSubCommentResponse(&comments), nil
 }
 
-func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pagination.Pagination) (*[]GetResponse, error) {
+func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pagination.Pagination) (*GetMultipleResponse, error) {
 	if paginationMain.Limit > 20 {
 		paginationMain.Limit = 20
 	}
@@ -123,11 +126,45 @@ func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pa
 		return nil, err
 	}
 
-	if len(*comments) == 0 {
+	if len(comments) == 0 {
 		return nil, err
 	}
 
-	return NewGetMultipleResponse(comments), nil
+	commentsCount, err := uc.CommentInteractor.Count(map[string]interface{}{
+		"movie_id":  movieResponse.ID,
+		"parent_id": nil,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var commentsIds []uint
+	for _, comment := range comments {
+		commentsIds = append(commentsIds, comment.ID)
+	}
+
+	subComments, err := uc.CommentInteractor.GetDistinctMultiple(
+		map[string]interface{}{"parent_id": commentsIds},
+		[]string{"id", "parent_id"},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	subCommentsCount := make(map[uint]int64)
+	for _, subComment := range subComments {
+		subCommentsCount[*subComment.ParentID] = subCommentsCount[*subComment.ParentID] + 1
+	}
+
+	if len(subCommentsCount) > 0 {
+		for key, comment := range comments {
+			if _, ok := subCommentsCount[comment.ID]; ok {
+				comments[key].SubCommentsCount = subCommentsCount[comment.ID]
+			}
+		}
+	}
+
+	return NewGetMultipleResponse(&comments, commentsCount), nil
 }
 
 func (uc *UseCase) Delete(commentId, userId uint) (int64, error) {

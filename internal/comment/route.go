@@ -25,7 +25,7 @@ func (h *Handler) Routes(r chi.Router) {
 						r.
 							With(pagination.SetPaginationContextMiddleware).
 							With(h.UserHandler.TryToGetUserId).
-							Get("/", h.GetHandler)
+							Get("/", h.GetMultipleSubCommentsHandler)
 						r.
 							With(h.UserHandler.IsAuthorized).
 							Delete("/", h.DeleteCommentHandler)

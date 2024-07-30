@@ -15,8 +15,8 @@ func (r *Repository) Create(comment *Comment) error {
 	return result.Error
 }
 
-func (r *Repository) Get(where map[string]interface{}, order, orderSub string, paginationSub *pagination.Pagination) (*Comment, error) {
-	comment := &Comment{}
+func (r *Repository) Get(where interface{}, order, orderSub string, paginationSub *pagination.Pagination) (Comment, error) {
+	comment := Comment{}
 	result := r.DB.
 		Preload("Parent").
 		Preload("User").
@@ -36,7 +36,17 @@ func (r *Repository) Get(where map[string]interface{}, order, orderSub string, p
 	return comment, result.Error
 }
 
-func (r *Repository) GetMultiple(where map[string]interface{}, order, orderSub string, pagination, paginationSub *pagination.Pagination) (*[]Comment, error) {
+func (r *Repository) GetDistinctMultiple(where, distinct interface{}) ([]Comment, error) {
+	var comments []Comment
+	result := r.DB.
+		Distinct(distinct).
+		Where(where).
+		Find(&comments)
+
+	return comments, result.Error
+}
+
+func (r *Repository) GetMultiple(where interface{}, order, orderSub string, pagination, paginationSub *pagination.Pagination) ([]Comment, error) {
 	var comments []Comment
 	result := r.DB.
 		Preload("User").
@@ -55,7 +65,17 @@ func (r *Repository) GetMultiple(where map[string]interface{}, order, orderSub s
 		Order(order).
 		Find(&comments)
 
-	return &comments, result.Error
+	return comments, result.Error
+}
+
+func (r *Repository) Count(where interface{}) (int64, error) {
+	var count int64
+	result := r.DB.
+		Model(&Comment{}).
+		Where(where).
+		Count(&count)
+
+	return count, result.Error
 }
 
 func (r *Repository) Delete(commentId, userId uint) (int64, error) {
