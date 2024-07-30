@@ -47,7 +47,7 @@ func (app *App) Start() {
 	ruc := role.New(app.DB)
 	movuc := movie.New(app.DB, pool, fuc)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
-	goauc := googleoauth.New(app.DB, uuc)
+	goauc := googleoauth.New(app.DB, uuc, fuc)
 	cuc := comment.New(app.DB, movuc)
 
 	// JWT Token

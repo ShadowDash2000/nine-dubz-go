@@ -2,6 +2,7 @@ package googleoauth
 
 import (
 	"gorm.io/gorm"
+	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
 )
 
@@ -45,8 +46,10 @@ func NewUserLoginRequest(userLoginRequest *UserLoginRequest) *user.User {
 }
 
 type UserRegistrationRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name       string
+	Email      string
+	PictureUrl string
+	Picture    *file.File
 }
 
 type UserRegistrationResponse struct {
@@ -55,7 +58,8 @@ type UserRegistrationResponse struct {
 
 func NewUserRegistrationRequest(userRegistrationRequest *UserRegistrationRequest) *user.User {
 	return &user.User{
-		Name:  userRegistrationRequest.Name,
-		Email: userRegistrationRequest.Email,
+		Name:    userRegistrationRequest.Name,
+		Email:   userRegistrationRequest.Email,
+		Picture: userRegistrationRequest.Picture,
 	}
 }

@@ -67,8 +67,9 @@ func (h *Handler) Authorize(w http.ResponseWriter, r *http.Request) {
 
 	// Try to register
 	registrationRequest := &UserRegistrationRequest{
-		Name:  strings.Split(googleUser.Email, "@")[0],
-		Email: googleUser.Email,
+		Name:       strings.Split(googleUser.Email, "@")[0],
+		Email:      googleUser.Email,
+		PictureUrl: googleUser.Picture,
 	}
 
 	userId, err = h.GoogleOAuthUseCase.Register(registrationRequest)

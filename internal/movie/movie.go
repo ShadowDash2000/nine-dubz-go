@@ -409,8 +409,14 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	if utf8.RuneCountInString(movie.Name) > 130 {
 		return errors.New("movie name too long")
 	}
+	if movie.Name == "" {
+		return errors.New("movie name is required")
+	}
 	if utf8.RuneCountInString(movie.Description) > 5000 {
 		return errors.New("movie description too long")
+	}
+	if movie.Description == "" {
+		return errors.New("movie description is required")
 	}
 
 	if movie.PreviewHeader != nil && movie.PreviewHeader.Size > 0 {
