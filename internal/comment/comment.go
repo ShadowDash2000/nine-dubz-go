@@ -32,7 +32,7 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 	}
 
 	if utf8.RuneCountInString(text) == 0 {
-		return errors.New("comment text too short")
+		return errors.New("comment text is required")
 	}
 
 	if utf8.RuneCountInString(text) > 5000 {

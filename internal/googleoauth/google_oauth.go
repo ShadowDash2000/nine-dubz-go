@@ -5,16 +5,21 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"
+	"net/http"
+	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
 	"os"
+	"strconv"
+	"strings"
 )
 
 type UseCase struct {
 	GoogleOAuthInteractor Interactor
 	UserUseCase           *user.UseCase
+	FileUseCase           *file.UseCase
 }
 
-func New(db *gorm.DB, ur *user.UseCase) *UseCase {
+func New(db *gorm.DB, ur *user.UseCase, fuc *file.UseCase) *UseCase {
 	clientId, ok := os.LookupEnv("GOOGLE_CLIENT_ID")
 	if !ok {
 		fmt.Println("Google Client ID not found in environment")
@@ -40,6 +45,7 @@ func New(db *gorm.DB, ur *user.UseCase) *UseCase {
 			OauthConfig: oauthConfig,
 		},
 		UserUseCase: ur,
+		FileUseCase: fuc,
 	}
 }
 
@@ -60,6 +66,23 @@ func (uc *UseCase) Login(loginRequest *UserLoginRequest) uint {
 func (uc *UseCase) Register(registrationRequest *UserRegistrationRequest) (uint, error) {
 	registrationPayload := NewUserRegistrationRequest(registrationRequest)
 	registrationPayload.Active = true
+
+	resp, err := http.Get(registrationRequest.PictureUrl)
+	if err == nil {
+		contentType := resp.Header.Get("Content-Type")
+		contentLength := resp.Header.Get("Content-Length")
+
+		pictureSize, err := strconv.Atoi(contentLength)
+		if err == nil {
+			pictureExt := strings.Split(contentType, "/")
+			if len(pictureExt) == 2 {
+				picture, err := uc.FileUseCase.SaveFile(resp.Body, "google_img."+pictureExt[1], int64(pictureSize), "public")
+				if err == nil {
+					registrationPayload.Picture = picture
+				}
+			}
+		}
+	}
 
 	return uc.UserUseCase.Add(registrationPayload)
 }
