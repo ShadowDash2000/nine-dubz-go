@@ -2,9 +2,12 @@ package comment
 
 import (
 	"errors"
+	"fmt"
 	"gorm.io/gorm"
 	"nine-dubz/internal/movie"
 	"nine-dubz/internal/pagination"
+	"nine-dubz/internal/sort"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -99,9 +102,14 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 	return NewGetMultipleSubCommentResponse(&comments), nil
 }
 
-func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pagination.Pagination) (*GetMultipleResponse, error) {
+func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pagination.Pagination, sort *sort.Sort) (*GetMultipleResponse, error) {
 	if paginationMain.Limit > 20 {
 		paginationMain.Limit = 20
+	}
+
+	if !slices.Contains([]string{"created_at"}, sort.SortBy) {
+		sort.SortBy = "created_at"
+		sort.SortVal = "desc"
 	}
 
 	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
@@ -114,7 +122,7 @@ func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pa
 			"movie_id":  movieResponse.ID,
 			"parent_id": nil,
 		},
-		"created_at desc",
+		fmt.Sprintf("%s %s", sort.SortBy, sort.SortVal),
 		"created_at asc",
 		paginationMain,
 		&pagination.Pagination{
