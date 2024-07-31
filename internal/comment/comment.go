@@ -51,19 +51,16 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 	}
 
 	if parentCommentId > 0 {
-		parentComment, err := uc.CommentInteractor.Get(
+		parentComments, err := uc.CommentInteractor.GetDistinctMultiple(
 			map[string]interface{}{"id": parentCommentId},
-			"",
-			"",
-			&pagination.Pagination{
-				Limit:  0,
-				Offset: 0,
-			},
+			[]string{"parent_id"},
 		)
 		if err != nil {
 			return err
-		} else if parentComment.Parent != nil {
-			return errors.New("parent comment already exists")
+		} else if len(parentComments) > 0 {
+			if parentComments[0].ParentID != nil {
+				return errors.New("parent comment already exists")
+			}
 		}
 
 		comment.ParentID = &parentCommentId

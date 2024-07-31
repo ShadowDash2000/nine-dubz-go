@@ -15,27 +15,6 @@ func (r *Repository) Create(comment *Comment) error {
 	return result.Error
 }
 
-func (r *Repository) Get(where interface{}, order, orderSub string, paginationSub *pagination.Pagination) (Comment, error) {
-	comment := Comment{}
-	result := r.DB.
-		Preload("Parent").
-		Preload("User").
-		Preload("User.Picture").
-		Preload("SubComments", func(db *gorm.DB) *gorm.DB {
-			return db.
-				Order(orderSub).
-				Limit(paginationSub.Limit).
-				Offset(paginationSub.Offset)
-		}).
-		Preload("SubComments.User").
-		Preload("SubComments.User.Picture").
-		Where(where).
-		Order(order).
-		First(comment)
-
-	return comment, result.Error
-}
-
 func (r *Repository) GetDistinctMultiple(where, distinct interface{}) ([]Comment, error) {
 	var comments []Comment
 	result := r.DB.
