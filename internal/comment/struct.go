@@ -10,7 +10,8 @@ import (
 type Comment struct {
 	gorm.Model
 	Text             string
-	MovieID          uint `gorm:"not null"`
+	Mentions         []Mention `gorm:"-"`
+	MovieID          uint      `gorm:"not null"`
 	Movie            movie.Movie
 	UserID           uint `gorm:"not null"`
 	User             user.User
@@ -18,6 +19,11 @@ type Comment struct {
 	Parent           *Comment
 	SubCommentsCount int64     `gorm:"-"`
 	SubComments      []Comment `gorm:"foreignKey:ParentID"`
+}
+
+type Mention struct {
+	UserID  uint   `json:"userId"`
+	Mention string `json:"mention"`
 }
 
 type AddRequest struct {
@@ -28,6 +34,7 @@ type GetResponse struct {
 	ID               uint                    `json:"id"`
 	CreatedAt        time.Time               `json:"createdAt"`
 	Text             string                  `json:"text"`
+	Mentions         []Mention               `json:"mentions,omitempty"`
 	User             *user.GetPublicResponse `json:"user"`
 	Parent           *GetResponse            `json:"-"`
 	SubCommentsCount int64                   `json:"subCommentsCount"`
@@ -39,6 +46,7 @@ func NewGetResponse(comment *Comment) *GetResponse {
 		ID:               comment.ID,
 		CreatedAt:        comment.CreatedAt,
 		Text:             comment.Text,
+		Mentions:         comment.Mentions,
 		User:             user.NewGetPublicResponse(&comment.User),
 		SubCommentsCount: comment.SubCommentsCount,
 		SubComments:      *NewGetMultipleSubCommentResponse(&comment.SubComments),
@@ -51,6 +59,7 @@ type GetSubCommentResponse struct {
 	ID        uint                    `json:"id"`
 	CreatedAt time.Time               `json:"createdAt"`
 	Text      string                  `json:"text"`
+	Mentions  []Mention               `json:"mentions,omitempty"`
 	User      *user.GetPublicResponse `json:"user"`
 }
 
@@ -59,6 +68,7 @@ func NewGetSubCommentResponse(comment *Comment) *GetSubCommentResponse {
 		ID:        comment.ID,
 		CreatedAt: comment.CreatedAt,
 		Text:      comment.Text,
+		Mentions:  comment.Mentions,
 		User:      user.NewGetPublicResponse(&comment.User),
 	}
 

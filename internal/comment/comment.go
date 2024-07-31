@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -192,14 +191,14 @@ func (uc *UseCase) Format(comments *[]Comment) error {
 	r := regexp.MustCompile(`<@id:(\d*)>`)
 	var userIds []uint
 	type Text struct {
-		UserIds []uint
-		Text    *string
+		UserIds  []uint
+		Mentions *[]Mention
 	}
 	var texts []Text
 
 	for i, comment := range *comments {
 		commentText := Text{
-			Text: &(*comments)[i].Text,
+			Mentions: &(*comments)[i].Mentions,
 		}
 		matches := r.FindAllStringSubmatch(comment.Text, -1)
 		for _, match := range matches {
@@ -217,7 +216,7 @@ func (uc *UseCase) Format(comments *[]Comment) error {
 
 		for j, subComment := range comment.SubComments {
 			subCommentsText := Text{
-				Text: &(*comments)[i].SubComments[j].Text,
+				Mentions: &(*comments)[i].SubComments[j].Mentions,
 			}
 			matches = r.FindAllStringSubmatch(subComment.Text, -1)
 			for _, match := range matches {
@@ -256,11 +255,15 @@ func (uc *UseCase) Format(comments *[]Comment) error {
 		userNames[user.ID] = user.Name
 	}
 	for _, text := range texts {
+		i := 0
 		for _, userId := range text.UserIds {
 			if _, ok := userNames[userId]; ok {
-				oldText := fmt.Sprintf("<@id:%d>", userId)
-				newText := fmt.Sprintf("@%s", userNames[userId])
-				*text.Text = strings.ReplaceAll(*text.Text, oldText, newText)
+				mention := fmt.Sprintf("@%s", userNames[userId])
+				*text.Mentions = append(*text.Mentions, Mention{
+					UserID:  userId,
+					Mention: mention,
+				})
+				i = i + 1
 			}
 		}
 	}
