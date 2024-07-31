@@ -9,6 +9,7 @@ type Interactor interface {
 	Updates(user *User) error
 	Get(user *User) error
 	GetWhere(user *User, where map[string]interface{}) error
+	GetMultiple(where, distinct interface{}) ([]User, error)
 	GetById(id uint) (*User, error)
 	GetByName(name string) (*User, error)
 	GetRolesByUserId(userId uint) ([]role.Role, error)
