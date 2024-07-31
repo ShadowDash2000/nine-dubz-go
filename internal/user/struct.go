@@ -20,6 +20,7 @@ type User struct {
 }
 
 type ShortResponse struct {
+	ID      uint       `json:"id"`
 	Name    string     `json:"name"`
 	Email   string     `json:"email"`
 	Picture *file.File `json:"picture"`
@@ -27,6 +28,7 @@ type ShortResponse struct {
 
 func NewShortResponse(user *User) *ShortResponse {
 	return &ShortResponse{
+		ID:      user.ID,
 		Name:    user.Name,
 		Email:   user.Email,
 		Picture: user.Picture,
@@ -34,12 +36,14 @@ func NewShortResponse(user *User) *ShortResponse {
 }
 
 type GetPublicResponse struct {
+	ID      uint       `json:"id"`
 	Name    string     `json:"name"`
 	Picture *file.File `json:"picture"`
 }
 
 func NewGetPublicResponse(user *User) *GetPublicResponse {
 	return &GetPublicResponse{
+		ID:      user.ID,
 		Name:    user.Name,
 		Picture: user.Picture,
 	}

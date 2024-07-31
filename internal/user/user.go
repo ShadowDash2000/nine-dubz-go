@@ -111,6 +111,10 @@ func (uc *UseCase) ConfirmRegistration(email, hash string) (uint, bool) {
 	return user.ID, true
 }
 
+func (uc *UseCase) GetMultiple(where, distinct interface{}) ([]User, error) {
+	return uc.UserInteractor.GetMultiple(where, distinct)
+}
+
 func (uc *UseCase) GetById(id uint) (*User, error) {
 	return uc.UserInteractor.GetById(id)
 }

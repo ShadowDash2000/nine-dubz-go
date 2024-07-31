@@ -7,21 +7,27 @@ import (
 	"nine-dubz/internal/movie"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/sort"
+	"nine-dubz/internal/user"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
 type UseCase struct {
 	CommentInteractor Interactor
 	MovieUseCase      *movie.UseCase
+	UserUseCase       *user.UseCase
 }
 
-func New(db *gorm.DB, muc *movie.UseCase) *UseCase {
+func New(db *gorm.DB, muc *movie.UseCase, uuc *user.UseCase) *UseCase {
 	return &UseCase{
 		CommentInteractor: &Repository{
 			DB: db,
 		},
 		MovieUseCase: muc,
+		UserUseCase:  uuc,
 	}
 }
 
@@ -94,6 +100,11 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	err = uc.Format(&comments)
+	if err != nil {
+		return nil, errors.New("comment: error while formatting comments")
 	}
 
 	return NewGetMultipleSubCommentResponse(&comments), nil
@@ -169,7 +180,92 @@ func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pa
 		}
 	}
 
+	err = uc.Format(&comments)
+	if err != nil {
+		return nil, errors.New("comment: error while formatting comments")
+	}
+
 	return NewGetMultipleResponse(&comments, commentsCount), nil
+}
+
+func (uc *UseCase) Format(comments *[]Comment) error {
+	r := regexp.MustCompile(`<@id:(\d*)>`)
+	var userIds []uint
+	type Text struct {
+		UserIds []uint
+		Text    *string
+	}
+	var texts []Text
+
+	for i, comment := range *comments {
+		commentText := Text{
+			Text: &(*comments)[i].Text,
+		}
+		matches := r.FindAllStringSubmatch(comment.Text, -1)
+		for _, match := range matches {
+			userId, err := strconv.ParseUint(match[1], 10, 32)
+			if err != nil {
+				continue
+			}
+			if !slices.Contains(userIds, uint(userId)) {
+				userIds = append(userIds, uint(userId))
+			}
+			if !slices.Contains(commentText.UserIds, uint(userId)) {
+				commentText.UserIds = append(commentText.UserIds, uint(userId))
+			}
+		}
+
+		for j, subComment := range comment.SubComments {
+			subCommentsText := Text{
+				Text: &(*comments)[i].SubComments[j].Text,
+			}
+			matches = r.FindAllStringSubmatch(subComment.Text, -1)
+			for _, match := range matches {
+				userId, err := strconv.ParseUint(match[1], 10, 32)
+				if err != nil {
+					continue
+				}
+				if !slices.Contains(userIds, uint(userId)) {
+					userIds = append(userIds, uint(userId))
+				}
+				if !slices.Contains(subCommentsText.UserIds, uint(userId)) {
+					subCommentsText.UserIds = append(subCommentsText.UserIds, uint(userId))
+				}
+			}
+
+			texts = append(texts, subCommentsText)
+		}
+
+		texts = append(texts, commentText)
+	}
+
+	if len(userIds) == 0 {
+		return nil
+	}
+
+	users, err := uc.UserUseCase.GetMultiple(
+		map[string]interface{}{"id": userIds},
+		[]string{"id", "name"},
+	)
+	if err != nil {
+		return err
+	}
+
+	userNames := make(map[uint]string)
+	for _, user := range users {
+		userNames[user.ID] = user.Name
+	}
+	for _, text := range texts {
+		for _, userId := range text.UserIds {
+			if _, ok := userNames[userId]; ok {
+				oldText := fmt.Sprintf("<@id:%d>", userId)
+				newText := fmt.Sprintf("@%s", userNames[userId])
+				*text.Text = strings.ReplaceAll(*text.Text, oldText, newText)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (uc *UseCase) Delete(commentId, userId uint) (int64, error) {

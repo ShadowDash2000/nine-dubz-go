@@ -94,7 +94,12 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	render.JSON(w, r, comments)
+	if comments != nil {
+		render.JSON(w, r, comments)
+	} else {
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
+	}
 }
 
 func (h *Handler) DeleteCommentHandler(w http.ResponseWriter, r *http.Request) {
