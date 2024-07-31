@@ -8,6 +8,12 @@ func (h *Handler) Routes(r chi.Router) {
 			r.
 				With(h.IsAuthorized).
 				Get("/", h.GetUserShortHandler)
+
+			r.Route("/{userId}", func(r chi.Router) {
+				r.
+					With(h.IsAuthorized).
+					Get("/", h.GetUserHandler)
+			})
 		})
 
 		r.Route("/check-by-name", func(r chi.Router) {

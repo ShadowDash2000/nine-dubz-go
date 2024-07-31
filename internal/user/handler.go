@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"net/http"
 	"nine-dubz/internal/helper"
@@ -10,6 +11,7 @@ import (
 	"nine-dubz/internal/token"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
+	"strconv"
 )
 
 type Handler struct {
@@ -130,6 +132,22 @@ func (h *Handler) GetUserShortHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, r, NewShortResponse(user))
+}
+
+func (h *Handler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
+	userId, err := strconv.ParseUint(chi.URLParam(r, "userId"), 10, 32)
+	if err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "Invalid user id")
+		return
+	}
+
+	user, err := h.UserUseCase.GetById(uint(userId))
+	if err != nil {
+		response.RenderError(w, r, http.StatusNotFound, "User not found")
+		return
+	}
+
+	render.JSON(w, r, NewGetPublicResponse(user))
 }
 
 func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Request) {
