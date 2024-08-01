@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/go-chi/render"
+	"golang.org/x/net/html"
 	"gorm.io/gorm"
 	"log"
 	"net/http"
@@ -15,7 +16,9 @@ import (
 	"nine-dubz/internal/googleoauth"
 	"nine-dubz/internal/mail"
 	"nine-dubz/internal/movie"
+	"nine-dubz/internal/response"
 	"nine-dubz/internal/role"
+	"nine-dubz/internal/seo"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/pkg/language"
@@ -49,6 +52,7 @@ func (app *App) Start() {
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc, fuc)
 	cuc := comment.New(app.DB, movuc, uuc)
+	seouc := seo.New(movuc)
 
 	// JWT Token
 	tokenSecretKey, ok := os.LookupEnv("TOKEN_SECRET_KEY")
@@ -63,6 +67,7 @@ func (app *App) Start() {
 	mh := movie.NewHandler(movuc, uh, fuc, ta, tuc)
 	goah := googleoauth.NewHandler(goauc, uh, tuc, ta)
 	ch := comment.NewHandler(cuc, uh)
+	seoh := seo.NewHandler(seouc)
 
 	//app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.Recoverer)
@@ -95,11 +100,27 @@ func (app *App) Start() {
 		})
 	})
 
-	app.Router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "public/index.html")
+	app.Router.Route("/assets", func(r chi.Router) {
+		fs := http.FileServer(http.Dir("public/dist/assets"))
+		r.Method("GET", "/*", http.StripPrefix("/assets/", fs))
 	})
-	app.Router.Get("/socket-test", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "public/socket_test.html")
+
+	app.Router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		file, err := os.Open("public/dist/index.html")
+		if err != nil {
+			response.RenderError(w, r, http.StatusInternalServerError, "")
+			return
+		}
+
+		document, err := html.Parse(file)
+		if err != nil {
+			response.RenderError(w, r, http.StatusInternalServerError, "")
+			return
+		}
+
+		seouc.SetSeo(r, document)
+
+		html.Render(w, document)
 	})
 
 	app.Router.Route("/api", func(r chi.Router) {
@@ -108,6 +129,7 @@ func (app *App) Start() {
 		mh.Routes(r)
 		goah.Routes(r)
 		ch.Routes(r)
+		seoh.Routes(r)
 	})
 
 	appIp, ok := os.LookupEnv("APP_IP")

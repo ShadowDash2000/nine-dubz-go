@@ -9,9 +9,11 @@ import (
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
+	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/pkg/ffmpegthumbs"
+	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/webvtt"
 	"os"
 	"path/filepath"
@@ -555,4 +557,29 @@ func (uc *UseCase) GetMultiple(pagination *pagination.Pagination) ([]*GetRespons
 	}
 
 	return moviesPayload, nil
+}
+
+func (uc *UseCase) GetMovieDetailSeo(movieCode string, r *http.Request) (map[string]string, error) {
+	movie, err := uc.Get(0, movieCode)
+	if err != nil {
+		return nil, err
+	}
+
+	var moviePreview string
+	if movie.Preview != nil {
+		moviePreview = "/api/file/" + movie.Preview.Name
+	} else if movie.DefaultPreview != nil {
+		moviePreview = "/api/file/" + movie.DefaultPreview.Name
+	}
+
+	languageCode := language.GetLanguageCode(r)
+	siteName, err := language.GetMessage("SITE_NAME", languageCode)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{
+		"title":       movie.Name + " - " + siteName,
+		"description": movie.Description,
+		"image":       moviePreview,
+	}, nil
 }

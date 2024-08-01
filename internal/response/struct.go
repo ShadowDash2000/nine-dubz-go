@@ -2,7 +2,6 @@ package response
 
 import (
 	"github.com/go-chi/render"
-	"log"
 	"net/http"
 	"nine-dubz/pkg/language"
 )
@@ -16,7 +15,6 @@ func RenderError(w http.ResponseWriter, r *http.Request, status int, message str
 	messageLang, err := language.GetMessage(message, language.GetLanguageCode(r))
 	if err != nil {
 		messageLang = message
-		log.Println(err)
 	}
 
 	render.Status(r, status)
@@ -30,7 +28,6 @@ func RenderSuccess(w http.ResponseWriter, r *http.Request, status int, message s
 	messageLang, err := language.GetMessage(message, language.GetLanguageCode(r))
 	if err != nil {
 		messageLang = message
-		log.Println(err)
 	}
 
 	render.Status(r, status)
