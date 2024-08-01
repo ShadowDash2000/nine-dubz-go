@@ -45,7 +45,7 @@ func (uc *UseCase) UpgradeConnection(w http.ResponseWriter, r *http.Request) (*w
 	return connection, nil
 }
 
-func (uc *UseCase) StreamFile(fileName, requestRange string) ([]byte, string, string, error) {
+func (uc *UseCase) StreamFile(fileName, requestRange string) ([]byte, string, int64, error) {
 	var off int
 	if len(requestRange) > 0 {
 		requestRange = strings.Replace(requestRange, "bytes=", "", -1)
@@ -60,11 +60,11 @@ func (uc *UseCase) StreamFile(fileName, requestRange string) ([]byte, string, st
 	contentRange := strconv.Itoa(off) + "-" + strconv.Itoa(len(buff)+off)
 	output, err := uc.S3Storage.GetRangeObject(fileName, "bytes="+contentRange)
 	if err != nil {
-		return nil, "", "", err
+		return nil, "", 0, err
 	}
 
 	contentRange = aws.ToString(output.ContentRange)
-	contentLength := strconv.Itoa(int(aws.ToInt64(output.ContentLength)))
+	contentLength := aws.ToInt64(output.ContentLength)
 
 	buff, _ = io.ReadAll(output.Body)
 

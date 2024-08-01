@@ -40,7 +40,7 @@ func NewApp(db gorm.DB) *App {
 }
 
 func (app *App) Start() {
-	pool := pond.New(10, 300)
+	pool := pond.New(4, 300)
 	defer pool.StopAndWait()
 
 	// Use cases
@@ -144,7 +144,7 @@ func (app *App) Start() {
 	fmt.Println(fmt.Sprintf("Starting server at: %s:%s", appIp, appPort))
 
 	// If server were crashed, try to re-post-process them
-	movuc.RetryVideoPostProcess()
+	go movuc.RetryVideoPostProcess()
 
 	err := http.ListenAndServe(appIp+":"+appPort, app.Router)
 	if err != nil {

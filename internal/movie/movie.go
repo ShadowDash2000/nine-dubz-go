@@ -174,18 +174,56 @@ func (uc *UseCase) RetryVideoPostProcess() {
 			uc.Delete(movie.UserId, movie.Code)
 			continue
 		}
-		tmpFile, err := os.Open(movie.VideoTmp.OriginalName)
+
+		tmpPath := "upload/tmp"
+		err = os.MkdirAll(tmpPath, os.ModePerm)
+		if err != nil {
+			uc.Delete(movie.UserId, movie.Code)
+			continue
+		}
+		tmpFile, err := os.CreateTemp(tmpPath, "websocket_upload_")
 		if err != nil {
 			uc.Delete(movie.UserId, movie.Code)
 			continue
 		}
 
+		var currentByte int64
+		for {
+			if currentByte >= movie.VideoTmp.Size {
+				break
+			}
+
+			requestRange := fmt.Sprintf("bytes=%d-", currentByte)
+			buff, _, contentLength, err := uc.FileUseCase.StreamFile(movie.VideoTmp.Name, requestRange)
+			if err != nil {
+				tmpFile.Close()
+				os.Remove(tmpFile.Name())
+				uc.Delete(movie.UserId, movie.Code)
+				break
+			}
+
+			tmpFile.Write(buff)
+
+			currentByte = currentByte + contentLength
+		}
+
+		if currentByte < movie.VideoTmp.Size {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+			uc.Delete(movie.UserId, movie.Code)
+			continue
+		}
+
+		tmpFile.Close()
+
+		movieCopy := movie
+
 		header := &VideoUploadHeader{
-			MovieCode: movie.Code,
+			MovieCode: movieCopy.Code,
 		}
 
 		uc.Pool.Submit(func() {
-			uc.PostProcessVideo(header, tmpFile, movie)
+			uc.PostProcessVideo(header, tmpFile, movieCopy)
 		})
 	}
 }
