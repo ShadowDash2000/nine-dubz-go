@@ -2,6 +2,10 @@
   "code": "ru",
   "messages": [
     {
+      "code": "SITE_NAME",
+      "text": "Nine-Dubz"
+    },
+    {
       "code": "REGISTRATION_ALREADY_EXIST",
       "text": "Пользователь с таким email уже существует"
     },
@@ -44,6 +48,10 @@
     {
       "code": "EMAIL_REGISTRATION_CONFIRMATION_CONTENT",
       "text": "Привет, {userName}!\nВы получили данное письмо, так как зарегистрировались на сайте Nine Dubz\n\nПожалуйста, подтвердите регистрацию проследовав по этой ссылке: {link}"
+    },
+    {
+      "code": "SEO_DEFAULT_DESCRIPTION",
+      "text": "Nine-Dubz - сайт, где делается даб-даб"
     }
   ]
 }

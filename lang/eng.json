@@ -2,6 +2,10 @@
   "code": "eng",
   "messages": [
     {
+      "code": "SITE_NAME",
+      "text": "Nine-Dubz"
+    },
+    {
       "code": "REGISTRATION_ALREADY_EXIST",
       "text": "User with this email already exist"
     },
@@ -44,6 +48,10 @@
     {
       "code": "EMAIL_REGISTRATION_CONFIRMATION_CONTENT",
       "text": "Hi, {userName}!\n\nYou have received this email because you have registered on Nine Dubz website\n\nPlease, confirm your registration by following this link: {link}"
+    },
+    {
+      "code": "SEO_DEFAULT_DESCRIPTION",
+      "text": "Nine-Dubz is a website where dub-dub is made"
     }
   ]
 }
