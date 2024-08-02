@@ -1,6 +1,7 @@
 package file
 
 import (
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
@@ -143,6 +144,45 @@ func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, conn *w
 
 	tmpFile, _ = os.Open(tmpFile.Name())
 	defer tmpFile.Close()
+
+	return tmpFile, nil
+}
+
+func (uc *UseCase) DownloadFile(path, name string, file *File) (*os.File, error) {
+	err := os.MkdirAll(path, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	tmpFile, err := os.Create(filepath.Join(path, name))
+	if err != nil {
+		return nil, err
+	}
+	defer tmpFile.Close()
+
+	var currentByte int64
+	for {
+		if currentByte >= file.Size {
+			break
+		}
+
+		requestRange := fmt.Sprintf("bytes=%d-", currentByte)
+		buff, _, contentLength, err := uc.StreamFile(file.Name, requestRange)
+		if err != nil {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+			return nil, err
+		}
+
+		tmpFile.Write(buff)
+
+		currentByte = currentByte + contentLength
+	}
+
+	if currentByte < file.Size {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, errors.New("file: file was corrupted while downloading")
+	}
 
 	return tmpFile, nil
 }

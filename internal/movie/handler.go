@@ -329,28 +329,28 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file := movie.Video
+	video := movie.Video
 	switch quality {
 	case "0":
-		file = movie.VideoShakal
+		video = movie.VideoShakal
 		break
 	case "360":
-		file = movie.Video360
+		video = movie.Video360
 		break
 	case "480":
-		file = movie.Video480
+		video = movie.Video480
 		break
 	case "720":
-		file = movie.Video720
+		video = movie.Video720
 		break
 	}
 
-	if file == nil {
+	if video == nil {
 		response.RenderError(w, r, http.StatusNotFound, "No such quality")
 		return
 	}
 
-	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(file.Name, requestRange)
+	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(video.File.Name, requestRange)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "File not found")
 		return

@@ -22,22 +22,30 @@ type Movie struct {
 	DefaultPreview   *file.File `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
 	Name             string     `json:"name"`
 	VideoTmpId       *uint      `json:"-"`
-	VideoTmp         *file.File `json:"-" gorm:"foreignKey:VideoTmpId;references:ID;"`
+	VideoTmp         *Video     `json:"-" gorm:"foreignKey:VideoTmpId;references:ID;"`
 	VideoId          *uint      `json:"-"`
-	Video            *file.File `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
+	Video            *Video     `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
 	VideoShakalId    *uint      `json:"-"`
-	VideoShakal      *file.File `json:"videoShakal" gorm:"foreignKey:VideoShakalId;references:ID;"`
+	VideoShakal      *Video     `json:"videoShakal" gorm:"foreignKey:VideoShakalId;references:ID;"`
 	Video360Id       *uint      `json:"-"`
-	Video360         *file.File `json:"video360" gorm:"foreignKey:Video360Id;references:ID;"`
+	Video360         *Video     `json:"video360" gorm:"foreignKey:Video360Id;references:ID;"`
 	Video480Id       *uint      `json:"-"`
-	Video480         *file.File `json:"video480" gorm:"foreignKey:Video480Id;references:ID;"`
+	Video480         *Video     `json:"video480" gorm:"foreignKey:Video480Id;references:ID;"`
 	Video720Id       *uint      `json:"-"`
-	Video720         *file.File `json:"video720" gorm:"foreignKey:Video720Id;references:ID;"`
+	Video720         *Video     `json:"video720" gorm:"foreignKey:Video720Id;references:ID;"`
 	UserId           uint       `json:"-"`
 	User             user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
 	WebVttId         *uint      `json:"-"`
 	WebVtt           *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 	WebVttImages     string     `json:"-"`
+}
+
+type Video struct {
+	gorm.Model `json:"-"`
+	Width      int        `json:"width"`
+	Height     int        `json:"height"`
+	FileID     uint       `json:"-"`
+	File       *file.File `json:"file"`
 }
 
 type VideoUploadHeader struct {
@@ -75,11 +83,11 @@ type GetResponse struct {
 	Preview        *file.File              `json:"preview"`
 	DefaultPreview *file.File              `json:"defaultPreview"`
 	Name           string                  `json:"name"`
-	Video          *file.File              `json:"video"`
-	VideoShakal    *file.File              `json:"videoShakal"`
-	Video360       *file.File              `json:"video360"`
-	Video480       *file.File              `json:"video480"`
-	Video720       *file.File              `json:"video720"`
+	Video          *Video                  `json:"video"`
+	VideoShakal    *Video                  `json:"videoShakal"`
+	Video360       *Video                  `json:"video360"`
+	Video480       *Video                  `json:"video480"`
+	Video720       *Video                  `json:"video720"`
 	WebVtt         *file.File              `json:"webVtt"`
 	User           *user.GetPublicResponse `json:"user"`
 }
@@ -111,7 +119,7 @@ type GetForUserResponse struct {
 	Preview        *file.File `json:"preview"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	Name           string     `json:"name"`
-	Video          *file.File `json:"video"`
+	Video          *Video     `json:"video"`
 }
 
 func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
@@ -131,12 +139,12 @@ type VideoUpdateRequest struct {
 	Status         string     `json:"-"`
 	Name           string     `json:"name"`
 	Code           string     `json:"code"`
-	VideoTmp       *file.File `json:"-"`
-	Video          *file.File `json:"video"`
-	VideoShakal    *file.File `json:"videoShakal"`
-	Video360       *file.File `json:"video360"`
-	Video480       *file.File `json:"video480"`
-	Video720       *file.File `json:"video720"`
+	VideoTmp       *Video     `json:"-"`
+	Video          *Video     `json:"video"`
+	VideoShakal    *Video     `json:"videoShakal"`
+	Video360       *Video     `json:"video360"`
+	Video480       *Video     `json:"video480"`
+	Video720       *Video     `json:"video720"`
 	DefaultPreview *file.File `json:"defaultPreview"`
 	WebVtt         *file.File `json:"webVtt"`
 	WebVttImages   string     `json:"-"`

@@ -20,11 +20,13 @@ type Format struct {
 }
 
 type Stream struct {
+	CodecType  string `json:"codec_type"`
 	DurationTs int    `json:"duration_ts"`
 	Duration   string `json:"duration"`
 	RFrameRate string `json:"r_frame_rate"`
 	Width      int    `json:"width"`
 	Height     int    `json:"height"`
+	Bitrate    string `json:"bit_rate"`
 }
 
 func SplitVideoToThumbnails(filePath, outputPath string, frameDuration int) error {
@@ -66,12 +68,19 @@ func GetVideoDuration(filePath string) (int, error) {
 		return 0, err
 	}
 
-	duration, err := strconv.Atoi(strings.Split(probe.Streams[0].Duration, ".")[0])
-	if err != nil {
-		return 0, err
+	var duration string
+	for _, stream := range probe.Streams {
+		if stream.CodecType == "video" {
+			duration = strings.Split(stream.Duration, ".")[0]
+			break
+		}
 	}
 
-	return duration, nil
+	if duration == "" {
+		return 0, fmt.Errorf("ffmpeg: duration is empty")
+	}
+
+	return strconv.Atoi(duration)
 }
 
 func GetVideoSize(filePath string) (int, int, error) {
@@ -86,30 +95,58 @@ func GetVideoSize(filePath string) (int, int, error) {
 		return 0, 0, err
 	}
 
-	return probe.Streams[0].Width, probe.Streams[0].Height, nil
+	var width, height int
+	for _, stream := range probe.Streams {
+		if stream.CodecType == "video" {
+			width = stream.Width
+			height = stream.Height
+			break
+		}
+	}
+
+	if width == 0 || height == 0 {
+		return 0, 0, fmt.Errorf("ffmpeg: width or height is empty")
+	}
+
+	return width, height, nil
 }
 
-func GetVideoBitrate(filePath string) (int, error) {
+func GetVideoBitrate(filePath string) (string, error) {
+	return GetBitrate(filePath, "video")
+}
+
+func GetAudioBitrate(filePath string) (string, error) {
+	return GetBitrate(filePath, "audio")
+}
+
+func GetBitrate(filePath, codecType string) (string, error) {
 	probe := &Probe{}
 	fileInfoJson, err := ffmpeg.Probe(filePath)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	err = json.Unmarshal([]byte(fileInfoJson), &probe)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
-	bitrate, err := strconv.Atoi(probe.Format.Bitrate)
-	if err != nil {
-		return 0, err
+	var bitrate string
+	for _, stream := range probe.Streams {
+		if stream.CodecType == codecType {
+			bitrate = stream.Bitrate
+			break
+		}
+	}
+
+	if bitrate == "" {
+		return "", fmt.Errorf("ffmpeg: bitrate is empty")
 	}
 
 	return bitrate, nil
 }
 
-func Resize(height int, crf, speed, bitrate, filePath, outputPath, fileName string) error {
+func Resize(height int, crf, speed, videoBitrate, audioBitrate, filePath, outputPath, fileName string) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
@@ -123,8 +160,9 @@ func Resize(height int, crf, speed, bitrate, filePath, outputPath, fileName stri
 			"c:v":   "libvpx-vp9",
 			"crf":   crf,
 			"speed": speed,
-			"b:v":   bitrate,
+			"b:v":   videoBitrate,
 			"c:a":   "libopus",
+			"b:a":   audioBitrate,
 		}).
 		Silent(true).
 		OverWriteOutput().
