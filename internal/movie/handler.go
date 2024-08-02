@@ -331,7 +331,7 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 
 	video := movie.Video
 	switch quality {
-	case "0":
+	case "240":
 		video = movie.VideoShakal
 		break
 	case "360":
