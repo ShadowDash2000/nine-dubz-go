@@ -138,7 +138,7 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 	return movies, result.Error
 }
 
-func (mr *Repository) GetMultiple(pagination *pagination.Pagination) (*[]Movie, error) {
+func (mr *Repository) GetMultiple(pagination *pagination.Pagination, order string) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
 		Preload("Video").
@@ -159,6 +159,7 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination) (*[]Movie, 
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Where("is_published = 1").
+		Order(order).
 		Find(&movies)
 
 	return movies, result.Error

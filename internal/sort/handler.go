@@ -11,8 +11,8 @@ func SetSortContextMiddleware(next http.Handler) http.Handler {
 		sortBy := r.URL.Query().Get("sort-by")
 		sortVal := r.URL.Query().Get("sort")
 
-		if !slices.Contains([]string{"asc", "desc"}, sortBy) {
-			sortBy = "desc"
+		if !slices.Contains([]string{"asc", "desc"}, sortVal) {
+			sortVal = "desc"
 		}
 
 		sort := &Sort{
