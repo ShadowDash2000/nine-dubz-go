@@ -10,10 +10,12 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/sort"
+	"nine-dubz/internal/view"
 	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/webvtt"
@@ -30,9 +32,10 @@ type UseCase struct {
 	SiteUrl         string
 	Pool            *pond.WorkerPool
 	FileUseCase     *file.UseCase
+	ViewUseCase     *view.UseCase
 }
 
-func New(db *gorm.DB, pool *pond.WorkerPool, fuc *file.UseCase) *UseCase {
+func New(db *gorm.DB, pool *pond.WorkerPool, fuc *file.UseCase, vuc *view.UseCase) *UseCase {
 	siteUrl, ok := os.LookupEnv("SITE_URL")
 	if !ok {
 		log.Println("movie: SITE_URL not found in environment")
@@ -45,6 +48,7 @@ func New(db *gorm.DB, pool *pond.WorkerPool, fuc *file.UseCase) *UseCase {
 		SiteUrl:     siteUrl,
 		Pool:        pool,
 		FileUseCase: fuc,
+		ViewUseCase: vuc,
 	}
 }
 
@@ -565,24 +569,39 @@ func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRe
 	)
 }
 
-func (uc *UseCase) Get(userId uint, code string) (*GetResponse, error) {
+func (uc *UseCase) Get(userId *uint, code string, userIp ...net.IP) (*GetResponse, error) {
+	var ip net.IP
+	if len(userIp) == 1 {
+		ip = userIp[0]
+	}
+
 	movie, err := uc.MovieInteractor.Get(code)
 	if err != nil {
 		return nil, err
 	}
 
-	if movie.IsPublished {
-		return NewGetResponse(movie), nil
-	}
+	if movie.IsPublished || movie.UserId == *userId {
+		response := NewGetResponse(movie)
 
-	if movie.UserId == userId {
-		return NewGetResponse(movie), nil
+		viewsCount, err := uc.ViewUseCase.GetCount(movie.ID)
+		if err == nil {
+			response.Views = viewsCount
+		}
+
+		if ip != nil {
+			view, err := uc.ViewUseCase.Add(movie.ID, userId, ip)
+			if err == nil {
+				uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Views", view)
+			}
+		}
+
+		return response, nil
 	}
 
 	return nil, errors.New("not allowed")
 }
 
-func (uc *UseCase) CheckMovieAccess(userId uint, code string) (*GetResponse, error) {
+func (uc *UseCase) CheckMovieAccess(userId *uint, code string) (*GetResponse, error) {
 	movie, err := uc.MovieInteractor.Get(code)
 	if err != nil {
 		return nil, err
@@ -592,11 +611,7 @@ func (uc *UseCase) CheckMovieAccess(userId uint, code string) (*GetResponse, err
 		return nil, errors.New("no video")
 	}
 
-	if movie.IsPublished {
-		return NewGetResponse(movie), nil
-	}
-
-	if movie.UserId == userId {
+	if movie.IsPublished || (userId != nil && movie.UserId == *userId) {
 		return NewGetResponse(movie), nil
 	}
 
@@ -674,7 +689,7 @@ func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sort *sort.Sor
 }
 
 func (uc *UseCase) GetMovieDetailSeo(movieCode string, r *http.Request) (map[string]string, error) {
-	movie, err := uc.Get(0, movieCode)
+	movie, err := uc.Get(nil, movieCode)
 	if err != nil {
 		return nil, err
 	}

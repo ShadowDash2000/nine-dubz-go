@@ -27,7 +27,7 @@ func (h *Handler) IsAuthorized(next http.Handler) http.Handler {
 		}
 
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userId", userId)
+		ctx = context.WithValue(ctx, "userId", *(userId))
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -35,21 +35,13 @@ func (h *Handler) IsAuthorized(next http.Handler) http.Handler {
 
 func (h *Handler) TryToGetUserId(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var userId *uint
+
 		tokenCookie, err := r.Cookie("token")
-		if err != nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		if _, err = h.TokenAuthorize.VerifyToken(tokenCookie.Value); err != nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		userId, err := h.TokenUseCase.GetUserIdByToken(tokenCookie.Value)
-		if err != nil {
-			userId = 0
-			return
+		if err == nil {
+			if _, err = h.TokenAuthorize.VerifyToken(tokenCookie.Value); err == nil {
+				userId, _ = h.TokenUseCase.GetUserIdByToken(tokenCookie.Value)
+			}
 		}
 
 		ctx := r.Context()
@@ -75,15 +67,12 @@ func (h *Handler) IsNotAuthorized(next http.Handler) http.Handler {
 
 func (h *Handler) UserPermission(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userId := r.Context().Value("userId")
-		if userId == "" {
-			return
-		}
+		userId := r.Context().Value("userId").(uint)
 
 		routePattern := chi.RouteContext(r.Context()).RoutePattern()
 		method := r.Method
 
-		if ok := h.UserUseCase.CheckUserPermission(userId.(uint), routePattern, method); !ok {
+		if ok := h.UserUseCase.CheckUserPermission(userId, routePattern, method); !ok {
 			response.RenderError(w, r, http.StatusForbidden, "Permission denied")
 			return
 		}

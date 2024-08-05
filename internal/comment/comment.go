@@ -44,7 +44,7 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 		return errors.New("comment text too long")
 	}
 
-	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
+	movieResponse, err := uc.MovieUseCase.Get(&userId, movieCode)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 		paginationMain.Limit = 10
 	}
 
-	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
+	movieResponse, err := uc.MovieUseCase.Get(&userId, movieCode)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 	return NewGetMultipleSubCommentResponse(&comments), nil
 }
 
-func (uc *UseCase) GetMultiple(userId uint, movieCode string, paginationMain *pagination.Pagination, sort *sort.Sort) (*GetMultipleResponse, error) {
+func (uc *UseCase) GetMultiple(userId *uint, movieCode string, paginationMain *pagination.Pagination, sort *sort.Sort) (*GetMultipleResponse, error) {
 	if paginationMain.Limit > 20 {
 		paginationMain.Limit = 20
 	}

@@ -45,6 +45,10 @@ func (mr *Repository) UpdatesSelectWhere(movie *Movie, selectQuery, whereQuery i
 	return result.RowsAffected, result.Error
 }
 
+func (mr *Repository) AppendAssociation(movie *Movie, association string, append interface{}) error {
+	return mr.DB.Model(movie).Association(association).Append(append)
+}
+
 func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
