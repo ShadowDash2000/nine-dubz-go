@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/alitto/pond"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
@@ -12,11 +13,13 @@ import (
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
+	"nine-dubz/internal/sort"
 	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/webvtt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -640,12 +643,20 @@ func (uc *UseCase) GetForUser(userId uint, code string) (*GetForUserResponse, er
 	return NewGetForUserResponse(movie), nil
 }
 
-func (uc *UseCase) GetMultiple(pagination *pagination.Pagination) ([]*GetResponse, error) {
+func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sort *sort.Sort) ([]*GetResponse, error) {
 	if pagination.Limit > 20 {
 		pagination.Limit = 20
 	}
 
-	movies, err := uc.MovieInteractor.GetMultiple(pagination)
+	if !slices.Contains([]string{"created_at"}, sort.SortBy) {
+		sort.SortBy = "created_at"
+		sort.SortVal = "desc"
+	}
+
+	movies, err := uc.MovieInteractor.GetMultiple(
+		pagination,
+		fmt.Sprintf("%s %s", sort.SortBy, sort.SortVal),
+	)
 	if err != nil {
 		return nil, err
 	}
