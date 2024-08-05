@@ -24,6 +24,7 @@ import (
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -100,13 +101,18 @@ func (app *App) Start() {
 		})
 	})
 
+	distPath, ok := os.LookupEnv("DIST_PATH")
+	if !ok {
+		distPath = "public/dist"
+	}
+
 	app.Router.Route("/assets", func(r chi.Router) {
-		fs := http.FileServer(http.Dir("public/dist/assets"))
+		fs := http.FileServer(http.Dir(filepath.Join(distPath, "assets")))
 		r.Method("GET", "/*", http.StripPrefix("/assets/", fs))
 	})
 
 	app.Router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		file, err := os.Open("public/dist/index.html")
+		file, err := os.Open(filepath.Join(distPath, "index.html"))
 		if err != nil {
 			response.RenderError(w, r, http.StatusInternalServerError, "")
 			return
