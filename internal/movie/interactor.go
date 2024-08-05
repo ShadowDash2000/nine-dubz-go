@@ -10,6 +10,7 @@ type Interactor interface {
 	Save(movie *Movie) error
 	Updates(movie *Movie) error
 	UpdatesWhere(movie *Movie, where map[string]interface{}) (int64, error)
+	UpdatesSelectWhere(movie *Movie, selectQuery, whereQuery interface{}) (int64, error)
 	Get(code string) (*Movie, error)
 	GetUnscoped(code string) (*Movie, error)
 	GetWhere(code string, where map[string]interface{}) (*Movie, error)

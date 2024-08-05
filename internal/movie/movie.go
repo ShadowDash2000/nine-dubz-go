@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
+	"log"
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
@@ -23,15 +24,22 @@ import (
 
 type UseCase struct {
 	MovieInteractor Interactor
+	SiteUrl         string
 	Pool            *pond.WorkerPool
 	FileUseCase     *file.UseCase
 }
 
 func New(db *gorm.DB, pool *pond.WorkerPool, fuc *file.UseCase) *UseCase {
+	siteUrl, ok := os.LookupEnv("SITE_URL")
+	if !ok {
+		log.Println("movie: SITE_URL not found in environment")
+	}
+
 	return &UseCase{
 		MovieInteractor: &Repository{
 			DB: db,
 		},
+		SiteUrl:     siteUrl,
 		Pool:        pool,
 		FileUseCase: fuc,
 	}
@@ -471,18 +479,20 @@ func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) (int64, error) {
 
 func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	movieRequest := NewUpdateRequest(movie)
+	var selectQuery []string
 
 	if utf8.RuneCountInString(movie.Name) > 130 {
 		return errors.New("movie name too long")
 	}
-	if movie.Name == "" {
-		return errors.New("movie name is required")
-	}
 	if utf8.RuneCountInString(movie.Description) > 5000 {
 		return errors.New("movie description too long")
 	}
-	if movie.Description == "" {
-		return errors.New("movie description is required")
+
+	if utf8.RuneCountInString(movie.Name) > 0 {
+		selectQuery = append(selectQuery, "Name")
+	}
+	if utf8.RuneCountInString(movie.Description) > 0 {
+		selectQuery = append(selectQuery, "Description")
 	}
 
 	if movie.PreviewHeader != nil && movie.PreviewHeader.Size > 0 {
@@ -521,14 +531,19 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 				)
 				webpFile.Close()
 
-				movieRequest.PreviewWebp = previewWebp
+				movieRequest.PreviewWebpId = &previewWebp.ID
 			}
 		}
 
-		movieRequest.Preview = preview
+		movieRequest.PreviewId = &preview.ID
+		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
 	}
 
-	rowsAffected, err := uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
+	rowsAffected, err := uc.MovieInteractor.UpdatesSelectWhere(
+		movieRequest,
+		selectQuery,
+		map[string]interface{}{"code": movie.Code, "user_id": userId},
+	)
 	if err != nil {
 		return err
 	} else if rowsAffected == 0 {
@@ -540,7 +555,11 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 
 func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRequest) (int64, error) {
 	movieRequest := NewUpdatePublishStatusRequest(movie)
-	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
+	return uc.MovieInteractor.UpdatesSelectWhere(
+		movieRequest,
+		[]string{"is_published"},
+		map[string]interface{}{"code": movie.Code, "user_id": userId},
+	)
 }
 
 func (uc *UseCase) Get(userId uint, code string) (*GetResponse, error) {
@@ -651,9 +670,9 @@ func (uc *UseCase) GetMovieDetailSeo(movieCode string, r *http.Request) (map[str
 
 	var moviePreview string
 	if movie.Preview != nil {
-		moviePreview = "/api/file/" + movie.Preview.Name
+		moviePreview = uc.SiteUrl + "/api/file/" + movie.Preview.Name
 	} else if movie.DefaultPreview != nil {
-		moviePreview = "/api/file/" + movie.DefaultPreview.Name
+		moviePreview = uc.SiteUrl + "/api/file/" + movie.DefaultPreview.Name
 	}
 
 	languageCode := language.GetLanguageCode(r)
