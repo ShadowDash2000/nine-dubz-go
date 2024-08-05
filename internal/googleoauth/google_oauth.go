@@ -5,6 +5,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"
+	"log"
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
@@ -30,7 +31,7 @@ func New(db *gorm.DB, ur *user.UseCase, fuc *file.UseCase) *UseCase {
 	}
 	siteUrl, ok := os.LookupEnv("SITE_URL")
 	if !ok {
-		fmt.Println("Site URL not found in environment")
+		log.Println("SITE_URL not found in environment")
 	}
 
 	oauthConfig := &oauth2.Config{

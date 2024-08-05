@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
+	"log"
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
@@ -23,15 +24,22 @@ import (
 
 type UseCase struct {
 	MovieInteractor Interactor
+	SiteUrl         string
 	Pool            *pond.WorkerPool
 	FileUseCase     *file.UseCase
 }
 
 func New(db *gorm.DB, pool *pond.WorkerPool, fuc *file.UseCase) *UseCase {
+	siteUrl, ok := os.LookupEnv("SITE_URL")
+	if !ok {
+		log.Println("movie: SITE_URL not found in environment")
+	}
+
 	return &UseCase{
 		MovieInteractor: &Repository{
 			DB: db,
 		},
+		SiteUrl:     siteUrl,
 		Pool:        pool,
 		FileUseCase: fuc,
 	}
@@ -662,9 +670,9 @@ func (uc *UseCase) GetMovieDetailSeo(movieCode string, r *http.Request) (map[str
 
 	var moviePreview string
 	if movie.Preview != nil {
-		moviePreview = "/api/file/" + movie.Preview.Name
+		moviePreview = uc.SiteUrl + "/api/file/" + movie.Preview.Name
 	} else if movie.DefaultPreview != nil {
-		moviePreview = "/api/file/" + movie.DefaultPreview.Name
+		moviePreview = uc.SiteUrl + "/api/file/" + movie.DefaultPreview.Name
 	}
 
 	languageCode := language.GetLanguageCode(r)
