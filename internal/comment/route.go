@@ -9,7 +9,6 @@ import (
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/comment", func(r chi.Router) {
 		r.
-			With(h.UserHandler.IsAuthorized).
 			Route("/{movieCode}", func(r chi.Router) {
 				r.
 					With(h.UserHandler.IsAuthorized).
