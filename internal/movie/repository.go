@@ -39,6 +39,12 @@ func (mr *Repository) UpdatesWhere(movie *Movie, where map[string]interface{}) (
 	return result.RowsAffected, result.Error
 }
 
+func (mr *Repository) UpdatesSelectWhere(movie *Movie, selectQuery, whereQuery interface{}) (int64, error) {
+	result := mr.DB.Select(selectQuery).Where(whereQuery).Updates(&movie)
+
+	return result.RowsAffected, result.Error
+}
+
 func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.

@@ -471,18 +471,20 @@ func (uc *UseCase) UpdateVideo(movie *VideoUpdateRequest) (int64, error) {
 
 func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	movieRequest := NewUpdateRequest(movie)
+	var selectQuery []string
 
 	if utf8.RuneCountInString(movie.Name) > 130 {
 		return errors.New("movie name too long")
 	}
-	if movie.Name == "" {
-		return errors.New("movie name is required")
-	}
 	if utf8.RuneCountInString(movie.Description) > 5000 {
 		return errors.New("movie description too long")
 	}
-	if movie.Description == "" {
-		return errors.New("movie description is required")
+
+	if utf8.RuneCountInString(movie.Name) > 0 {
+		selectQuery = append(selectQuery, "Name")
+	}
+	if utf8.RuneCountInString(movie.Description) > 0 {
+		selectQuery = append(selectQuery, "Description")
 	}
 
 	if movie.PreviewHeader != nil && movie.PreviewHeader.Size > 0 {
@@ -521,14 +523,19 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 				)
 				webpFile.Close()
 
-				movieRequest.PreviewWebp = previewWebp
+				movieRequest.PreviewWebpId = &previewWebp.ID
 			}
 		}
 
-		movieRequest.Preview = preview
+		movieRequest.PreviewId = &preview.ID
+		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
 	}
 
-	rowsAffected, err := uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
+	rowsAffected, err := uc.MovieInteractor.UpdatesSelectWhere(
+		movieRequest,
+		selectQuery,
+		map[string]interface{}{"code": movie.Code, "user_id": userId},
+	)
 	if err != nil {
 		return err
 	} else if rowsAffected == 0 {
@@ -540,7 +547,11 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 
 func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRequest) (int64, error) {
 	movieRequest := NewUpdatePublishStatusRequest(movie)
-	return uc.MovieInteractor.UpdatesWhere(movieRequest, map[string]interface{}{"code": movie.Code, "user_id": userId})
+	return uc.MovieInteractor.UpdatesSelectWhere(
+		movieRequest,
+		[]string{"is_published"},
+		map[string]interface{}{"code": movie.Code, "user_id": userId},
+	)
 }
 
 func (uc *UseCase) Get(userId uint, code string) (*GetResponse, error) {
