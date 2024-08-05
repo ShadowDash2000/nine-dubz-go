@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -32,18 +31,10 @@ func NewGormDb() *gorm.DB {
 	}
 	dbName, ok := os.LookupEnv("DB_NAME")
 	if !ok {
-		dbName = "nine-dubz"
+		dbName = "nine_dubz"
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/?charset=utf8mb4&parseTime=True&loc=Local", dbLogin, dbPassword, dbHost)
-	sqlDb, err := sql.Open("mysql", dsn)
-	if err != nil {
-		panic("Failed to connect database")
-	}
-	sqlDb.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", dbName))
-	sqlDb.Close()
-
-	dsn = fmt.Sprintf("%s:%s@tcp(%s:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbLogin, dbPassword, dbHost, dbName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbLogin, dbPassword, dbHost, dbName)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		//Logger: logger.Default.LogMode(logger.Info),
 		Logger:      logger.Default.LogMode(logger.Silent),

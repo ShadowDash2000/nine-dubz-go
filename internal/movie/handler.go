@@ -2,10 +2,12 @@ package movie
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/gorilla/websocket"
+	"mime/multipart"
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
@@ -153,7 +155,12 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(6 << 20); err != nil {
+	if err := r.ParseMultipartForm(2 << 20); err != nil {
+		if errors.Is(err, multipart.ErrMessageTooLarge) {
+			response.RenderError(w, r, http.StatusBadRequest, "File is too large")
+			return
+		}
+
 		response.RenderError(w, r, http.StatusBadRequest, "Failed to parse form data")
 		return
 	}
