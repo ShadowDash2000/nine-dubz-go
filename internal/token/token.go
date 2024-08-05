@@ -38,11 +38,11 @@ func (uc *UseCase) GetByUserId(userId uint) (*Token, error) {
 	return uc.TokenInteractor.GetByUserId(userId)
 }
 
-func (uc *UseCase) GetUserIdByToken(tokenString string) (uint, error) {
+func (uc *UseCase) GetUserIdByToken(tokenString string) (*uint, error) {
 	token, err := uc.TokenInteractor.GetUserIdByToken(tokenString)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	return token.UserId, nil
+	return &token.UserId, nil
 }

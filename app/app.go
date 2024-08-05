@@ -21,6 +21,7 @@ import (
 	"nine-dubz/internal/seo"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
+	"nine-dubz/internal/view"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
@@ -49,7 +50,8 @@ func (app *App) Start() {
 	fuc := file.New(app.DB)
 	tuc := token.New(app.DB)
 	ruc := role.New(app.DB)
-	movuc := movie.New(app.DB, pool, fuc)
+	vuc := view.New(app.DB)
+	movuc := movie.New(app.DB, pool, fuc, vuc)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
 	goauc := googleoauth.New(app.DB, uuc, fuc)
 	cuc := comment.New(app.DB, movuc, uuc)

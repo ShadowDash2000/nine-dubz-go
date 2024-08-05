@@ -16,6 +16,7 @@ import (
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/pkg/tokenauthorize"
+	"nine-dubz/pkg/userip"
 	"strconv"
 )
 
@@ -38,14 +39,10 @@ func NewHandler(uc *UseCase, uh *user.Handler, fuc *file.UseCase, ta *tokenautho
 }
 
 func (h *Handler) AddHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 
 	movieAddRequest := &AddRequest{
-		UserId: userId.(uint),
+		UserId: userId,
 	}
 	movieAddResponse, err := h.MovieUseCase.Add(movieAddRequest)
 	if err != nil {
@@ -135,7 +132,7 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ok := h.MovieUseCase.CheckByUser(userId, header.MovieCode); !ok {
+	if ok := h.MovieUseCase.CheckByUser(*userId, header.MovieCode); !ok {
 		conn.WriteJSON(&file.UploadStatus{
 			Status: file.UploadStatusError,
 			Error:  "Permission denied",
@@ -143,18 +140,14 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.MovieUseCase.SaveVideo(userId, header, conn)
+	err = h.MovieUseCase.SaveVideo(*userId, header, conn)
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
 		if errors.Is(err, multipart.ErrMessageTooLarge) {
@@ -182,7 +175,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		movieUpdateRequest.PreviewHeader = fileHeader
 	}
 
-	err = h.MovieUseCase.UpdateByUserId(userId.(uint), movieUpdateRequest)
+	err = h.MovieUseCase.UpdateByUserId(userId, movieUpdateRequest)
 	if err != nil {
 		response.RenderError(w, r, http.StatusBadRequest, "Can't update movie: "+err.Error())
 		return
@@ -195,12 +188,10 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
-	userId := r.Context().Value("userId")
-	if userId == nil {
-		userId = uint(0)
-	}
+	userId := r.Context().Value("userId").(*uint)
 
-	movie, err := h.MovieUseCase.Get(userId.(uint), movieCode)
+	userIp, _ := userip.GetIP(r)
+	movie, err := h.MovieUseCase.Get(userId, movieCode, userIp)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
@@ -211,12 +202,9 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetForUserHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
-	userId := r.Context().Value("userId")
-	if userId == nil {
-		userId = uint(0)
-	}
+	userId := r.Context().Value("userId").(uint)
 
-	movie, err := h.MovieUseCase.GetForUser(userId.(uint), movieCode)
+	movie, err := h.MovieUseCase.GetForUser(userId, movieCode)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
@@ -226,14 +214,10 @@ func (h *Handler) GetForUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetMultipleForUserHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
 
-	moviesResponse, err := h.MovieUseCase.GetMultipleByUserId(userId.(uint), pagination)
+	moviesResponse, err := h.MovieUseCase.GetMultipleByUserId(userId, pagination)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
@@ -268,14 +252,10 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 	movieCode := chi.URLParam(r, "movieCode")
 
-	if err := h.MovieUseCase.Delete(userId.(uint), movieCode); err != nil {
+	if err := h.MovieUseCase.Delete(userId, movieCode); err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
@@ -284,11 +264,7 @@ func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteMultipleHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 
 	moviesDeleteRequest := &[]DeleteRequest{}
 	if err := json.NewDecoder(r.Body).Decode(moviesDeleteRequest); err != nil {
@@ -296,7 +272,7 @@ func (h *Handler) DeleteMultipleHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.MovieUseCase.DeleteMultiple(userId.(uint), moviesDeleteRequest); err != nil {
+	if err := h.MovieUseCase.DeleteMultiple(userId, moviesDeleteRequest); err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 	}
 
@@ -304,11 +280,7 @@ func (h *Handler) DeleteMultipleHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Request) {
-	userId := r.Context().Value("userId")
-	if userId == "" {
-		response.RenderError(w, r, http.StatusUnauthorized, "Unauthorized")
-		return
-	}
+	userId := r.Context().Value("userId").(uint)
 
 	movieUpdatePublishStatusRequest := &UpdatePublishStatusRequest{}
 	if err := json.NewDecoder(r.Body).Decode(movieUpdatePublishStatusRequest); err != nil {
@@ -316,7 +288,7 @@ func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	rowsAffected, err := h.MovieUseCase.UpdatePublishStatus(userId.(uint), movieUpdatePublishStatusRequest)
+	rowsAffected, err := h.MovieUseCase.UpdatePublishStatus(userId, movieUpdatePublishStatusRequest)
 	if err != nil || rowsAffected == 0 {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
@@ -327,12 +299,9 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
 	quality := r.URL.Query().Get("q")
 	requestRange := r.Header.Get("Range")
-	userId := r.Context().Value("userId")
-	if userId == nil {
-		userId = uint(0)
-	}
+	userId := r.Context().Value("userId").(*uint)
 
-	movie, err := h.MovieUseCase.CheckMovieAccess(userId.(uint), movieCode)
+	movie, err := h.MovieUseCase.CheckMovieAccess(userId, movieCode)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return

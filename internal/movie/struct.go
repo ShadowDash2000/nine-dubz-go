@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
+	"nine-dubz/internal/view"
 	"time"
 )
 
@@ -42,6 +43,7 @@ type Movie struct {
 	WebVttId             *uint      `json:"-"`
 	WebVtt               *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 	WebVttImages         string     `json:"-"`
+	Views                []view.View
 }
 
 type Video struct {
@@ -96,6 +98,7 @@ type GetResponse struct {
 	Video720           *Video                  `json:"video720"`
 	WebVtt             *file.File              `json:"webVtt"`
 	User               *user.GetPublicResponse `json:"user"`
+	Views              *int64                  `json:"views"`
 }
 
 func NewGetResponse(movie *Movie) *GetResponse {
