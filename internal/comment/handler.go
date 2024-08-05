@@ -49,7 +49,7 @@ func (h *Handler) AddCommentHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = h.CommentUseCase.Add(userId, movieCode, commentAddRequest.Text, uint(commentId))
 	if err != nil {
-		response.RenderError(w, r, http.StatusBadRequest, "Can't add comment")
+		response.RenderError(w, r, http.StatusBadRequest, "Can't add comment: "+err.Error())
 		return
 	}
 
