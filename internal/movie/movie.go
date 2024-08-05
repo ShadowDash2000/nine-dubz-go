@@ -585,7 +585,6 @@ func (uc *UseCase) Get(userId *uint, code string, userIp ...net.IP) (*GetRespons
 
 		viewsCount, err := uc.ViewUseCase.GetCount(movie.ID)
 		if err == nil {
-			fmt.Println("views: count error:", viewsCount)
 			response.Views = viewsCount
 		}
 
@@ -593,8 +592,6 @@ func (uc *UseCase) Get(userId *uint, code string, userIp ...net.IP) (*GetRespons
 			view, err := uc.ViewUseCase.Add(movie.ID, userId, ip)
 			if err == nil {
 				uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Views", view)
-			} else {
-				fmt.Println("views: add error:", err)
 			}
 		}
 
