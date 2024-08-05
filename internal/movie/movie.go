@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"github.com/alitto/pond"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
@@ -274,51 +273,76 @@ func (uc *UseCase) PostProcessVideo(header *VideoUploadHeader, tmpFile *os.File,
 }
 
 func (uc *UseCase) CreateThumbnails(thumbsPath string, header *VideoUploadHeader, tmpFile *os.File) error {
-	thumbsWebvttPath := "/api/file/"
-	var imagesNames []string
-	imagesFilePath := make([]string, 0)
 	frameDuration := 10
-
 	err := ffmpegthumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
-	var defaultPreview *file.File
 	if err != nil {
-		fmt.Println(err)
-	} else {
-		items, _ := os.ReadDir(thumbsPath)
-		defaultPreviewPos := len(items) / 2
-		for i, item := range items {
-			if item.IsDir() {
-				continue
+		return errors.New("movie thumbnails: failed to create thumbnails")
+	}
+
+	thumbsWebvttPath := "/api/file/"
+	imagesFilePath := make([]string, 0)
+	var imagesNames []string
+	var preview *file.File
+	var previewWebp *file.File
+
+	items, _ := os.ReadDir(thumbsPath)
+	defaultPreviewPos := 1
+	if len(items) > 2 {
+		defaultPreviewPos = len(items) / 2
+	}
+	for i, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
+		imageFileInfo, _ := imageFile.Stat()
+		savedImageFile, _ := uc.FileUseCase.SaveFile(imageFile, item.Name(), imageFileInfo.Size(), "public")
+		imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
+		imagesNames = append(imagesNames, savedImageFile.Name)
+
+		if defaultPreviewPos == i+1 {
+			preview = savedImageFile
+		}
+
+		imageFile.Close()
+	}
+
+	if len(imagesFilePath) == 0 {
+		return errors.New("movie thumbnails: no thumbnails")
+	}
+
+	if preview != nil {
+		err = ffmpegthumbs.ToWebp(
+			filepath.Join(thumbsPath, preview.OriginalName),
+			thumbsPath,
+			preview.OriginalName,
+		)
+		if err == nil {
+			webpFile, err := os.Open(filepath.Join(thumbsPath, preview.OriginalName+".webp"))
+			if err == nil {
+				webpFileInfo, _ := webpFile.Stat()
+				previewWebp, _ = uc.FileUseCase.SaveFile(
+					webpFile, webpFileInfo.Name(), webpFileInfo.Size(), "public",
+				)
+				webpFile.Close()
 			}
-
-			imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
-			imageFileInfo, _ := imageFile.Stat()
-			savedImageFile, _ := uc.FileUseCase.SaveFile(imageFile, item.Name(), imageFileInfo.Size(), "public")
-			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
-			imagesNames = append(imagesNames, savedImageFile.Name)
-
-			if defaultPreviewPos == i+1 {
-				defaultPreview = savedImageFile
-			}
-
-			imageFile.Close()
 		}
 	}
 
 	var savedVttFile *file.File
-	if len(imagesFilePath) > 0 {
-		videoDuration, _ := ffmpegthumbs.GetVideoDuration(tmpFile.Name())
-		vttFile, _ := webvtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
-		vttFile, _ = os.Open(vttFile.Name())
-		savedVttFile, _ = uc.FileUseCase.SaveFile(vttFile, vttFile.Name(), 0, "public")
-		vttFile.Close()
-	}
+	videoDuration, _ := ffmpegthumbs.GetVideoDuration(tmpFile.Name())
+	vttFile, _ := webvtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
+	vttFile, _ = os.Open(vttFile.Name())
+	savedVttFile, _ = uc.FileUseCase.SaveFile(vttFile, vttFile.Name(), 0, "public")
+	vttFile.Close()
 
 	movieUpdateRequest := &VideoUpdateRequest{
-		Code:           header.MovieCode,
-		DefaultPreview: defaultPreview,
-		WebVtt:         savedVttFile,
-		WebVttImages:   strings.Join(imagesNames, ";"),
+		Code:               header.MovieCode,
+		DefaultPreview:     preview,
+		DefaultPreviewWebp: previewWebp,
+		WebVtt:             savedVttFile,
+		WebVttImages:       strings.Join(imagesNames, ";"),
 	}
 	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
 	if err != nil {
@@ -479,6 +503,26 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		preview, err := uc.FileUseCase.SaveFile(movie.Preview, movie.PreviewHeader.Filename, movie.PreviewHeader.Size, "public")
 		if err != nil {
 			return err
+		}
+
+		thumbsPath := filepath.Join("upload/thumbs", movie.Code)
+		previewWebpName := preview.OriginalName + ".webp"
+		err = ffmpegthumbs.ToWebp(
+			filepath.Join(thumbsPath, preview.OriginalName),
+			thumbsPath,
+			previewWebpName,
+		)
+		if err == nil {
+			webpFile, err := os.Open(filepath.Join(thumbsPath, previewWebpName))
+			if err == nil {
+				webpFileInfo, _ := webpFile.Stat()
+				previewWebp, _ := uc.FileUseCase.SaveFile(
+					webpFile, webpFileInfo.Name(), webpFileInfo.Size(), "public",
+				)
+				webpFile.Close()
+
+				movieRequest.PreviewWebp = previewWebp
+			}
 		}
 
 		movieRequest.Preview = preview

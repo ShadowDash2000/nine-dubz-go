@@ -199,3 +199,24 @@ func ToWebm(filePath, crf, speed, bitrate, outputPath, fileName string) error {
 
 	return nil
 }
+
+func ToWebp(filePath, outputPath, fileName string) error {
+	err := os.MkdirAll(outputPath, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	err = ffmpeg.
+		Input(filePath).
+		Output(filepath.Join(outputPath, fileName+".webp"), ffmpeg.KwArgs{
+			"c:v": "libwebp",
+		}).
+		Silent(true).
+		OverWriteOutput().
+		Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

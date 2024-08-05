@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -35,14 +36,15 @@ func NewGormDb() *gorm.DB {
 	}
 
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:3306)/?charset=utf8mb4&parseTime=True&loc=Local", dbLogin, dbPassword, dbHost)
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	sqlDb, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic("Failed to connect database")
 	}
+	sqlDb.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", dbName))
+	sqlDb.Close()
 
-	db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", dbName))
 	dsn = fmt.Sprintf("%s:%s@tcp(%s:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbLogin, dbPassword, dbHost, dbName)
-	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		//Logger: logger.Default.LogMode(logger.Info),
 		Logger:      logger.Default.LogMode(logger.Silent),
 		PrepareStmt: true,
@@ -61,6 +63,17 @@ func NewGormDb() *gorm.DB {
 		&movie.Movie{},
 		&comment.Comment{},
 	)
+
+	var count int64
+	db.Model(&role.Role{}).Where("code = ?", "all").Count(&count)
+	if count == 0 {
+		db.Create(&role.Role{Code: "all", Name: "all"})
+	}
+
+	db.Model(&role.Role{}).Where("code = ?", "admin").Count(&count)
+	if count == 0 {
+		db.Create(&role.Role{Code: "admin", Name: "admin"})
+	}
 
 	return db
 }
