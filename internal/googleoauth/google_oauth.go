@@ -28,11 +28,15 @@ func New(db *gorm.DB, ur *user.UseCase, fuc *file.UseCase) *UseCase {
 	if !ok {
 		fmt.Println("Google client secret not found in environment")
 	}
+	siteUrl, ok := os.LookupEnv("SITE_URL")
+	if !ok {
+		fmt.Println("Site URL not found in environment")
+	}
 
 	oauthConfig := &oauth2.Config{
 		ClientID:     clientId,
 		ClientSecret: clientSecret,
-		RedirectURL:  "http://localhost:25565/api/authorize/google/",
+		RedirectURL:  siteUrl + "/api/authorize/google/",
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 		},
