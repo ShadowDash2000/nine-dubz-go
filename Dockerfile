@@ -6,7 +6,7 @@ COPY . /nine-dubz/
 WORKDIR /nine-dubz/
 RUN go mod download
 
-RUN apt-get -y update && apt-get -y upgrade && install -y libwebp-dev && apt-get install -y ffmpeg
+RUN apt-get -y update && apt-get -y upgrade && apt-get install -y libwebp-dev && apt-get install -y ffmpeg
 
 RUN go build -a -installsuffix cgo -o ./nine-dubz
 
