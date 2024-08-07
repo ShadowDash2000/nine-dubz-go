@@ -139,6 +139,7 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 		Preload("Video720.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
+		Preload("DefaultPreview").
 		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Where("user_id = ?", userId).
