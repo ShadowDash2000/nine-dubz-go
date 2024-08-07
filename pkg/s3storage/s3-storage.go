@@ -58,7 +58,7 @@ func (sr *S3Storage) GetS3Client() *s3.Client {
 	return client
 }
 
-func (sr *S3Storage) PutObject(file io.Reader, key string) (*s3.PutObjectOutput, error) {
+func (sr *S3Storage) PutObject(file io.ReadSeeker, key string) (*s3.PutObjectOutput, error) {
 	client := sr.GetS3Client()
 
 	output, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
@@ -67,7 +67,11 @@ func (sr *S3Storage) PutObject(file io.Reader, key string) (*s3.PutObjectOutput,
 		Body:   file,
 	})
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
+	}
+
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
 		return nil, err
 	}
 

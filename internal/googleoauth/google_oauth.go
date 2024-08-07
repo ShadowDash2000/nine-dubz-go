@@ -1,10 +1,12 @@
 package googleoauth
 
 import (
+	"bytes"
 	"fmt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"gorm.io/gorm"
+	"io"
 	"log"
 	"net/http"
 	"nine-dubz/internal/file"
@@ -81,9 +83,13 @@ func (uc *UseCase) Register(registrationRequest *UserRegistrationRequest) (uint,
 		if err == nil {
 			pictureExt := strings.Split(contentType, "/")
 			if len(pictureExt) == 2 {
-				picture, err := uc.FileUseCase.SaveFile(resp.Body, "google_img."+pictureExt[1], int64(pictureSize), "public")
+				body, err := io.ReadAll(resp.Body)
 				if err == nil {
-					registrationPayload.Picture = picture
+					bodyReader := bytes.NewReader(body)
+					picture, err := uc.FileUseCase.SaveFile(bodyReader, "google_img."+pictureExt[1], int64(pictureSize), "public")
+					if err == nil {
+						registrationPayload.Picture = picture
+					}
 				}
 			}
 		}
