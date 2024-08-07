@@ -8,7 +8,7 @@ RUN go mod download
 
 RUN apk update \
     && apk upgrade \
-    && apk install ffmpeg
+    && apk add ffmpeg
 
 RUN go build -a -installsuffix cgo -o ./nine-dubz
 
