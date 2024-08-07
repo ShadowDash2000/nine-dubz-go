@@ -522,27 +522,43 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 			return err
 		}
 
-		thumbsPath := filepath.Join("upload/thumbs", movie.Code)
-		previewWebpName := preview.OriginalName + ".webp"
-		err = ffmpegthumbs.ToWebp(
-			filepath.Join(thumbsPath, preview.OriginalName),
-			thumbsPath,
-			previewWebpName,
-		)
-		if err == nil {
-			webpFile, err := os.Open(filepath.Join(thumbsPath, previewWebpName))
-			if err == nil {
-				webpFileInfo, _ := webpFile.Stat()
-				previewWebp, _ := uc.FileUseCase.SaveFile(
-					webpFile, webpFileInfo.Name(), webpFileInfo.Size(), "public",
-				)
-				webpFile.Close()
+		previewsPath := filepath.Join("upload/previews", movie.Code)
+		defer os.RemoveAll(previewsPath)
 
-				movieRequest.PreviewWebpId = &previewWebp.ID
-			}
+		err = os.MkdirAll(previewsPath, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		previewFile, err := os.Create(filepath.Join(previewsPath, preview.OriginalName))
+		if err != nil {
+			return err
+		}
+		defer previewFile.Close()
+		_, err = io.Copy(previewFile, movie.Preview)
+		if err != nil {
+			return err
 		}
 
+		err = ffmpegthumbs.ToWebp(
+			previewFile.Name(),
+			previewsPath,
+			preview.OriginalName,
+		)
+		if err != nil {
+			return err
+		}
+		webpFile, err := os.Open(filepath.Join(previewsPath, preview.OriginalName+".webp"))
+		if err != nil {
+			return err
+		}
+		webpFileInfo, _ := webpFile.Stat()
+		previewWebp, _ := uc.FileUseCase.SaveFile(
+			webpFile, webpFileInfo.Name(), webpFileInfo.Size(), "public",
+		)
+		webpFile.Close()
+
 		movieRequest.PreviewId = &preview.ID
+		movieRequest.PreviewWebpId = &previewWebp.ID
 		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
 	}
 

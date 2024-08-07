@@ -94,7 +94,7 @@ func (uc *UseCase) GetFile(fileName string) ([]byte, error) {
 	return buff, nil
 }
 
-func (uc *UseCase) SaveFile(file io.Reader, fileName string, fileSize int64, fileType string) (*File, error) {
+func (uc *UseCase) SaveFile(file io.ReadSeeker, fileName string, fileSize int64, fileType string) (*File, error) {
 	timeNow := time.Now().UnixNano()
 	randomNumber := rand.Intn(1000)
 

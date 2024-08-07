@@ -65,7 +65,9 @@ func (mr *Repository) Get(code string) (*Movie, error) {
 		Preload("Video720").
 		Preload("Video720.File").
 		Preload("Preview").
+		Preload("PreviewWebp").
 		Preload("DefaultPreview").
+		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Preload("User").
 		Preload("User.Picture").
@@ -89,7 +91,9 @@ func (mr *Repository) GetUnscoped(code string) (*Movie, error) {
 		Preload("Video720").
 		Preload("Video720.File").
 		Preload("Preview").
+		Preload("PreviewWebp").
 		Preload("DefaultPreview").
+		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		First(&movie, "code = ?", code)
 
@@ -110,7 +114,9 @@ func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movi
 		Preload("Video720").
 		Preload("Video720.File").
 		Preload("Preview").
+		Preload("PreviewWebp").
 		Preload("DefaultPreview").
+		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Where(where).
 		First(&movie, "code = ?", code)
@@ -132,7 +138,8 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 		Preload("Video720").
 		Preload("Video720.File").
 		Preload("Preview").
-		Preload("DefaultPreview").
+		Preload("PreviewWebp").
+		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Where("user_id = ?", userId).
 		Limit(pagination.Limit).
@@ -156,7 +163,9 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination, order strin
 		Preload("Video720").
 		Preload("Video720.File").
 		Preload("Preview").
+		Preload("PreviewWebp").
 		Preload("DefaultPreview").
+		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Preload("User").
 		Preload("User.Picture").
@@ -185,7 +194,9 @@ func (mr *Repository) GetWhereMultiple(pagination *pagination.Pagination, where 
 		Preload("Video720").
 		Preload("Video720.File").
 		Preload("Preview").
+		Preload("PreviewWebp").
 		Preload("DefaultPreview").
+		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Preload("User").
 		Preload("User.Picture").
