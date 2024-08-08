@@ -34,7 +34,7 @@ func (r *Repository) GetCountMultiple(movieIds []uint) (map[uint]int64, error) {
 	var views []View
 	result := r.DB.Select("id").Where("movie_id IN ?", movieIds).Find(&views)
 
-	var counts map[uint]int64
+	counts := make(map[uint]int64)
 	for _, view := range views {
 		if _, ok := counts[view.ID]; ok {
 			counts[view.ID] = counts[view.ID] + 1
