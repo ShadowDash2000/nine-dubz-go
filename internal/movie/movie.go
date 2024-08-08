@@ -560,8 +560,11 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		movieRequest.PreviewId = &preview.ID
 		movieRequest.PreviewWebpId = &previewWebp.ID
 		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
+		uc.RemovePreviewFiles(movie.Code)
 	} else if movie.RemovePreview {
 		movieRequest.PreviewId = nil
+		selectQuery = append(selectQuery, "PreviewId")
+		uc.RemovePreviewFiles(movie.Code)
 	}
 
 	rowsAffected, err := uc.MovieInteractor.UpdatesSelectWhere(
@@ -573,6 +576,31 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		return err
 	} else if rowsAffected == 0 {
 		return errors.New("movie not found")
+	}
+
+	return nil
+}
+
+func (uc *UseCase) RemovePreviewFiles(code string) error {
+	movie, err := uc.MovieInteractor.GetPreloadWhere(
+		[]string{"Preview", "PreviewWebp"},
+		map[string]interface{}{"code": code},
+	)
+	if err != nil {
+		return err
+	}
+
+	if movie.Preview != nil {
+		err = uc.FileUseCase.RemoveFile(movie.Preview.Name)
+		if err != nil {
+			return err
+		}
+	}
+	if movie.PreviewWebp != nil {
+		err = uc.FileUseCase.RemoveFile(movie.PreviewWebp.Name)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

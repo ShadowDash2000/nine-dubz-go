@@ -18,4 +18,5 @@ type Interactor interface {
 	GetMultipleByUserId(userId uint, pagination *pagination.Pagination) (*[]Movie, error)
 	GetMultiple(pagination *pagination.Pagination, order string) (*[]Movie, error)
 	GetWhereMultiple(pagination *pagination.Pagination, where map[string]interface{}) (*[]Movie, error)
+	GetPreloadWhere(preloads []string, whereQuery interface{}) (*Movie, error)
 }
