@@ -1,4 +1,4 @@
-package sort
+package sorting
 
 import (
 	"context"
@@ -20,7 +20,7 @@ func SetSortContextMiddleware(next http.Handler) http.Handler {
 			SortVal: sortVal,
 		}
 
-		ctx := context.WithValue(r.Context(), "sort", sort)
+		ctx := context.WithValue(r.Context(), "sorting", sort)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

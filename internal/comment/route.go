@@ -3,7 +3,7 @@ package comment
 import (
 	"github.com/go-chi/chi/v5"
 	"nine-dubz/internal/pagination"
-	"nine-dubz/internal/sort"
+	"nine-dubz/internal/sorting"
 )
 
 func (h *Handler) Routes(r chi.Router) {
@@ -15,7 +15,7 @@ func (h *Handler) Routes(r chi.Router) {
 					Post("/", h.AddCommentHandler)
 				r.
 					With(pagination.SetPaginationContextMiddleware).
-					With(sort.SetSortContextMiddleware).
+					With(sorting.SetSortContextMiddleware).
 					With(h.UserHandler.TryToGetUserId).
 					Get("/", h.GetMultipleHandler)
 				r.

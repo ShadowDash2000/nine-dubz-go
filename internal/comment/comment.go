@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 	"nine-dubz/internal/movie"
 	"nine-dubz/internal/pagination"
-	"nine-dubz/internal/sort"
+	"nine-dubz/internal/sorting"
 	"nine-dubz/internal/user"
 	"regexp"
 	"slices"
@@ -109,7 +109,7 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 	return NewGetMultipleSubCommentResponse(&comments), nil
 }
 
-func (uc *UseCase) GetMultiple(userId *uint, movieCode string, paginationMain *pagination.Pagination, sort *sort.Sort) (*GetMultipleResponse, error) {
+func (uc *UseCase) GetMultiple(userId *uint, movieCode string, paginationMain *pagination.Pagination, sort *sorting.Sort) (*GetMultipleResponse, error) {
 	if paginationMain.Limit > 20 {
 		paginationMain.Limit = 20
 	}

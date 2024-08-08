@@ -12,7 +12,7 @@ import (
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/response"
-	"nine-dubz/internal/sort"
+	"nine-dubz/internal/sorting"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/pkg/tokenauthorize"
@@ -240,9 +240,9 @@ func (h *Handler) GetMultipleForUserHandler(w http.ResponseWriter, r *http.Reque
 
 func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
-	sort := r.Context().Value("sort").(*sort.Sort)
+	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
-	moviesResponse, err := h.MovieUseCase.GetMultiple(pagination, sort)
+	moviesResponse, err := h.MovieUseCase.GetMultiple(pagination, sorting)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))

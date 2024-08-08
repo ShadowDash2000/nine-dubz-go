@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/response"
-	"nine-dubz/internal/sort"
+	"nine-dubz/internal/sorting"
 	"nine-dubz/internal/user"
 	"strconv"
 )
@@ -89,9 +89,9 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
 	userId := r.Context().Value("userId").(*uint)
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
-	sort := r.Context().Value("sort").(*sort.Sort)
+	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
-	comments, err := h.CommentUseCase.GetMultiple(userId, movieCode, pagination, sort)
+	comments, err := h.CommentUseCase.GetMultiple(userId, movieCode, pagination, sorting)
 	if err != nil {
 		response.RenderError(w, r, http.StatusBadRequest, "Can't get comments")
 		return
