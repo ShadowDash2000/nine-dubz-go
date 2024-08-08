@@ -37,6 +37,10 @@ func (uc *UseCase) Add(movieId uint, userId *uint, ip net.IP) (*View, error) {
 	return view, uc.ViewInteractor.Create(view)
 }
 
-func (uc *UseCase) GetCount(movieId uint) (*int64, error) {
+func (uc *UseCase) GetCount(movieId uint) (int64, error) {
 	return uc.ViewInteractor.GetCount(movieId)
+}
+
+func (uc *UseCase) GetMultipleCount(movieIds []uint) (map[uint]int64, error) {
+	return uc.ViewInteractor.GetCountMultiple(movieIds)
 }
