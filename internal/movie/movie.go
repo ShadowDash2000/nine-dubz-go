@@ -560,6 +560,9 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		movieRequest.PreviewId = &preview.ID
 		movieRequest.PreviewWebpId = &previewWebp.ID
 		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
+		uc.RemovePreview(movie.Code)
+	} else if movie.RemovePreview {
+		uc.RemovePreview(movie.Code)
 	}
 
 	rowsAffected, err := uc.MovieInteractor.UpdatesSelectWhere(
@@ -571,6 +574,31 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		return err
 	} else if rowsAffected == 0 {
 		return errors.New("movie not found")
+	}
+
+	return nil
+}
+
+func (uc *UseCase) RemovePreview(code string) error {
+	movie, err := uc.MovieInteractor.GetPreloadWhere(
+		[]string{"Preview", "PreviewWebp"},
+		map[string]interface{}{"code": code},
+	)
+	if err != nil {
+		return err
+	}
+
+	if movie.Preview != nil {
+		err = uc.FileUseCase.RemoveFile(movie.Preview.Name)
+		if err != nil {
+			return err
+		}
+	}
+	if movie.PreviewWebp != nil {
+		err = uc.FileUseCase.RemoveFile(movie.PreviewWebp.Name)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -699,6 +727,20 @@ func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sort *sort.Sor
 	var moviesPayload []*GetResponse
 	for _, movie := range *movies {
 		moviesPayload = append(moviesPayload, NewGetResponse(&movie))
+	}
+
+	var moviesIds []uint
+	for _, movie := range moviesPayload {
+		moviesIds = append(moviesIds, movie.ID)
+	}
+
+	viewsCounts, err := uc.ViewUseCase.GetMultipleCount(moviesIds)
+	if err == nil {
+		for key, movie := range moviesPayload {
+			if _, ok := viewsCounts[movie.ID]; ok {
+				moviesPayload[key].Views = viewsCounts[movie.ID]
+			}
+		}
 	}
 
 	return moviesPayload, nil

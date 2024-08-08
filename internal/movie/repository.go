@@ -208,3 +208,15 @@ func (mr *Repository) GetWhereMultiple(pagination *pagination.Pagination, where 
 
 	return movies, result.Error
 }
+
+func (mr *Repository) GetPreloadWhere(preloads []string, whereQuery interface{}) (*Movie, error) {
+	var movie *Movie
+	result := mr.DB
+	for _, preload := range preloads {
+		result = result.Preload(preload)
+	}
+
+	result = result.Where(whereQuery).First(&movie)
+
+	return movie, result.Error
+}

@@ -23,9 +23,25 @@ func (r *Repository) GetLast(movieId uint, userId *uint, ip string, time time.Ti
 	return view, result.Error
 }
 
-func (r *Repository) GetCount(movieId uint) (*int64, error) {
+func (r *Repository) GetCount(movieId uint) (int64, error) {
 	var count int64
 	result := r.DB.Model(&View{}).Where("movie_id = ?", movieId).Count(&count)
 
-	return &count, result.Error
+	return count, result.Error
+}
+
+func (r *Repository) GetCountMultiple(movieIds []uint) (map[uint]int64, error) {
+	var views []View
+	result := r.DB.Select("id").Where("movie_id IN ?", movieIds).Find(&views)
+
+	var counts map[uint]int64
+	for _, view := range views {
+		if _, ok := counts[view.ID]; ok {
+			counts[view.ID] = counts[view.ID] + 1
+		} else {
+			counts[view.ID] = 1
+		}
+	}
+
+	return counts, result.Error
 }

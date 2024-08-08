@@ -12,9 +12,11 @@ import (
 )
 
 type S3Storage struct {
-	AccessKey string
-	SecretKey string
-	Bucket    string
+	AccessKey    string
+	SecretKey    string
+	Bucket       string
+	Region       string
+	BaseEndpoint string
 }
 
 func NewS3Storage() *S3Storage {
@@ -30,11 +32,21 @@ func NewS3Storage() *S3Storage {
 	if !ok {
 		fmt.Println("S3_BUCKET environment variable not set")
 	}
+	region, ok := os.LookupEnv("S3_REGION")
+	if !ok {
+		region = "ru-1"
+	}
+	baseEndpoint, ok := os.LookupEnv("S3_BASE_ENDPOINT")
+	if !ok {
+		baseEndpoint = *aws.String("https://s3.timeweb.cloud")
+	}
 
 	return &S3Storage{
-		AccessKey: accessKey,
-		SecretKey: secretKey,
-		Bucket:    bucket,
+		AccessKey:    accessKey,
+		SecretKey:    secretKey,
+		Bucket:       bucket,
+		Region:       region,
+		BaseEndpoint: baseEndpoint,
 	}
 }
 
@@ -51,8 +63,8 @@ func (sr *S3Storage) GetS3Client() *s3.Client {
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.Region = "ru-1"
-		o.BaseEndpoint = aws.String("https://s3.timeweb.cloud")
+		o.Region = sr.Region
+		o.BaseEndpoint = &sr.BaseEndpoint
 	})
 
 	return client

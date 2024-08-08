@@ -98,7 +98,7 @@ type GetResponse struct {
 	Video720           *Video                  `json:"video720"`
 	WebVtt             *file.File              `json:"webVtt"`
 	User               *user.GetPublicResponse `json:"user"`
-	Views              *int64                  `json:"views"`
+	Views              int64                   `json:"views"`
 }
 
 func NewGetResponse(movie *Movie) *GetResponse {
@@ -190,6 +190,7 @@ type UpdateRequest struct {
 	Description   string                `json:"description,omitempty"`
 	Preview       multipart.File        `json:"preview,omitempty"`
 	PreviewHeader *multipart.FileHeader `json:"-"`
+	RemovePreview bool                  `json:"-"`
 	Name          string                `json:"name,omitempty"`
 }
 
