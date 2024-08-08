@@ -3,14 +3,14 @@ package movie
 import (
 	"github.com/go-chi/chi/v5"
 	"nine-dubz/internal/pagination"
-	"nine-dubz/internal/sort"
+	"nine-dubz/internal/sorting"
 )
 
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/movie", func(r chi.Router) {
 		r.
 			With(pagination.SetPaginationContextMiddleware).
-			With(sort.SetSortContextMiddleware).
+			With(sorting.SetSortContextMiddleware).
 			Get("/", h.GetMultipleHandler)
 
 		r.

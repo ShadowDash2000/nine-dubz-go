@@ -14,7 +14,7 @@ import (
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
-	"nine-dubz/internal/sort"
+	"nine-dubz/internal/sorting"
 	"nine-dubz/internal/view"
 	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/language"
@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -702,19 +703,21 @@ func (uc *UseCase) GetForUser(userId uint, code string) (*GetForUserResponse, er
 	return NewGetForUserResponse(movie), nil
 }
 
-func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sort *sort.Sort) ([]*GetResponse, error) {
+func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
 	if pagination.Limit > 20 {
 		pagination.Limit = 20
 	}
 
-	if !slices.Contains([]string{"created_at"}, sort.SortBy) {
-		sort.SortBy = "created_at"
-		sort.SortVal = "desc"
+	order := ""
+	if slices.Contains([]string{"created_at"}, sorting.SortBy) {
+		order = fmt.Sprintf("%s %s", sorting.SortBy, sorting.SortVal)
+	} else {
+		order = "created_at desc"
 	}
 
 	movies, err := uc.MovieInteractor.GetMultiple(
 		pagination,
-		fmt.Sprintf("%s %s", sort.SortBy, sort.SortVal),
+		order,
 	)
 	if err != nil {
 		return nil, err
@@ -740,6 +743,21 @@ func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sort *sort.Sor
 			if _, ok := viewsCounts[movie.ID]; ok {
 				moviesPayload[key].Views = viewsCounts[movie.ID]
 			}
+		}
+	}
+
+	if sorting.SortBy == "views" {
+		switch sorting.SortVal {
+		case "desc":
+			sort.Slice(moviesPayload, func(i, j int) bool {
+				return moviesPayload[i].Views > moviesPayload[j].Views
+			})
+			break
+		case "asc":
+			sort.Slice(moviesPayload, func(i, j int) bool {
+				return moviesPayload[i].Views < moviesPayload[j].Views
+			})
+			break
 		}
 	}
 

@@ -1,4 +1,4 @@
-package sort
+package sorting
 
 type Sort struct {
 	SortBy  string `json:"sort-by,omitempty"`
