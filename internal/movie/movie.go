@@ -560,6 +560,8 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		movieRequest.PreviewId = &preview.ID
 		movieRequest.PreviewWebpId = &previewWebp.ID
 		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
+	} else if movie.RemovePreview {
+		movieRequest.PreviewId = nil
 	}
 
 	rowsAffected, err := uc.MovieInteractor.UpdatesSelectWhere(

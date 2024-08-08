@@ -174,6 +174,12 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		movieUpdateRequest.Preview = file
 		movieUpdateRequest.PreviewHeader = fileHeader
 	}
+	if file == nil {
+		removePreview, err := strconv.ParseBool(r.PostForm.Get("preview"))
+		if err == nil {
+			movieUpdateRequest.RemovePreview = !removePreview
+		}
+	}
 
 	err = h.MovieUseCase.UpdateByUserId(userId, movieUpdateRequest)
 	if err != nil {

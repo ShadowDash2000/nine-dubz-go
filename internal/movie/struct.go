@@ -190,6 +190,7 @@ type UpdateRequest struct {
 	Description   string                `json:"description,omitempty"`
 	Preview       multipart.File        `json:"preview,omitempty"`
 	PreviewHeader *multipart.FileHeader `json:"-"`
+	RemovePreview bool                  `json:"-"`
 	Name          string                `json:"name,omitempty"`
 }
 
