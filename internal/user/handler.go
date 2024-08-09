@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"mime/multipart"
 	"net/http"
 	"nine-dubz/internal/helper"
 	"nine-dubz/internal/response"
@@ -180,8 +179,9 @@ func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Requ
 
 func (h *Handler) UpdatePictureHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
-		if errors.Is(err, multipart.ErrMessageTooLarge) {
-			response.RenderError(w, r, http.StatusBadRequest, "FILE_TOO_LARGE")
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			response.RenderError(w, r, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE")
 			return
 		}
 

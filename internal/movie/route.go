@@ -2,6 +2,7 @@ package movie
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/sorting"
 )
@@ -25,7 +26,9 @@ func (h *Handler) Routes(r chi.Router) {
 				})
 				r.Route("/{movieCode}", func(r chi.Router) {
 					r.Delete("/", h.DeleteHandler)
-					r.Post("/", h.UpdateHandler)
+					r.
+						With(middleware.RequestSize(2<<20)).
+						Post("/", h.UpdateHandler)
 					r.Get("/", h.GetForUserHandler)
 				})
 				r.Route("/upload", func(r chi.Router) {
