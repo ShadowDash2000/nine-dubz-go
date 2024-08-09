@@ -673,7 +673,7 @@ func (uc *UseCase) CheckByUser(userId uint, code string) bool {
 }
 
 func (uc *UseCase) GetMultipleByUserId(userId uint, pagination *pagination.Pagination) ([]*GetForUserResponse, error) {
-	if pagination.Limit > 20 {
+	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
 	}
 
@@ -704,7 +704,7 @@ func (uc *UseCase) GetForUser(userId uint, code string) (*GetForUserResponse, er
 }
 
 func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
-	if pagination.Limit > 20 {
+	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
 	}
 

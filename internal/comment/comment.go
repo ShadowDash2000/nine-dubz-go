@@ -75,7 +75,7 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 }
 
 func (uc *UseCase) GetMultipleSubComments(userId *uint, movieCode string, parentId uint, pagination *pagination.Pagination) (*[]GetSubCommentResponse, error) {
-	if pagination.Limit > 10 {
+	if pagination.Limit > 10 || pagination.Limit == -1 {
 		pagination.Limit = 10
 	}
 

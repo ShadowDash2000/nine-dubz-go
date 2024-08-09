@@ -1,6 +1,9 @@
 package user
 
-import "github.com/go-chi/chi/v5"
+import (
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+)
 
 func (h *Handler) Routes(r chi.Router) {
 	r.Route("/user", func(r chi.Router) {
@@ -23,6 +26,7 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Route("/update-picture", func(r chi.Router) {
 			r.
 				With(h.IsAuthorized).
+				With(middleware.RequestSize(2<<20)).
 				Post("/", h.UpdatePictureHandler)
 		})
 

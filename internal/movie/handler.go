@@ -7,7 +7,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/gorilla/websocket"
-	"mime/multipart"
 	"net/http"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
@@ -150,8 +149,9 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId").(uint)
 
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
-		if errors.Is(err, multipart.ErrMessageTooLarge) {
-			response.RenderError(w, r, http.StatusBadRequest, "File is too large")
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			response.RenderError(w, r, http.StatusRequestEntityTooLarge, "FILE_TOO_LARGE")
 			return
 		}
 
