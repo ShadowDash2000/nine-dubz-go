@@ -38,7 +38,6 @@ type GetResponse struct {
 	User             *user.GetPublicResponse `json:"user"`
 	Parent           *GetResponse            `json:"-"`
 	SubCommentsCount int64                   `json:"subCommentsCount"`
-	SubComments      []GetSubCommentResponse `json:"subComments,omitempty"`
 }
 
 func NewGetResponse(comment *Comment) *GetResponse {
@@ -49,7 +48,6 @@ func NewGetResponse(comment *Comment) *GetResponse {
 		Mentions:         comment.Mentions,
 		User:             user.NewGetPublicResponse(&comment.User),
 		SubCommentsCount: comment.SubCommentsCount,
-		SubComments:      *NewGetMultipleSubCommentResponse(&comment.SubComments),
 	}
 
 	return response

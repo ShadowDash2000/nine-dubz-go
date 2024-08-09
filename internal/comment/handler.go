@@ -59,10 +59,7 @@ func (h *Handler) AddCommentHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetMultipleSubCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	movieCode := chi.URLParam(r, "movieCode")
 	subPagination := r.Context().Value("pagination").(*pagination.Pagination)
-	userId := r.Context().Value("userId")
-	if userId == nil {
-		userId = uint(0)
-	}
+	userId := r.Context().Value("userId").(*uint)
 
 	var commentId uint64
 	var err error
@@ -76,7 +73,7 @@ func (h *Handler) GetMultipleSubCommentsHandler(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	comments, err := h.CommentUseCase.GetMultipleSubComments(userId.(uint), movieCode, uint(commentId), subPagination)
+	comments, err := h.CommentUseCase.GetMultipleSubComments(userId, movieCode, uint(commentId), subPagination)
 	if err != nil {
 		response.RenderError(w, r, http.StatusBadRequest, "Can't get comments")
 		return
