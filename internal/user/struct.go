@@ -75,3 +75,15 @@ func NewRegistrationRequest(user *RegistrationRequest) *User {
 		Password: user.Password,
 	}
 }
+
+type UpdateRequest struct {
+	ID   uint   `json:"-"`
+	Name string `json:"name"`
+}
+
+func NewUpdateRequest(user *UpdateRequest) *User {
+	return &User{
+		ID:   user.ID,
+		Name: user.Name,
+	}
+}

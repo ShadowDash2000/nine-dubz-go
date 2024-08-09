@@ -25,6 +25,12 @@ func (h *Handler) Routes(r chi.Router) {
 				With(h.IsAuthorized).
 				Post("/", h.UpdatePictureHandler)
 		})
+
+		r.Route("/update", func(r chi.Router) {
+			r.
+				With(h.IsAuthorized).
+				Post("/", h.UpdateHandler)
+		})
 	})
 	r.
 		Route("/authorize/inner", func(r chi.Router) {

@@ -150,6 +150,29 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 	return nil
 }
 
+func (uc *UseCase) Update(user *UpdateRequest) error {
+	fieldsToUpdate := 0
+
+	if user.Name != "" {
+		if ok := helper.ValidateUserName(user.Name); !ok {
+			return errors.New("REGISTRATION_INVALID_USER_NAME")
+		} else {
+			fieldsToUpdate = fieldsToUpdate + 1
+		}
+	}
+
+	if fieldsToUpdate == 0 {
+		return errors.New("USER_UPDATE_INVALID_FIELDS")
+	}
+
+	err := uc.UserInteractor.Updates(NewUpdateRequest(user))
+	if err != nil {
+		return errors.New("REGISTRATION_INTERNAL_ERROR")
+	}
+
+	return nil
+}
+
 func (uc *UseCase) CheckUserPermission(userId uint, routePattern string, method string) bool {
 	roles, err := uc.UserInteractor.GetRolesByUserId(userId)
 	if err != nil {
