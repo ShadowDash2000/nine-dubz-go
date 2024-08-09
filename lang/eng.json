@@ -52,6 +52,10 @@
     {
       "code": "SEO_DEFAULT_DESCRIPTION",
       "text": "Nine-Dubz is a website where dub-dub is made"
+    },
+    {
+      "code": "USER_UPDATE_INVALID_FIELDS",
+      "text": "Invalid user update fields"
     }
   ]
 }

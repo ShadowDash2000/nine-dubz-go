@@ -52,6 +52,10 @@
     {
       "code": "SEO_DEFAULT_DESCRIPTION",
       "text": "Nine-Dubz - сайт, где делается даб-даб"
+    },
+    {
+      "code": "USER_UPDATE_INVALID_FIELDS",
+      "text": "Некорректные поля для обновления пользователя"
     }
   ]
 }

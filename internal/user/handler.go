@@ -201,3 +201,21 @@ func (h *Handler) UpdatePictureHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
+	userId := r.Context().Value("userId").(uint)
+
+	userUpdateRequest := &UpdateRequest{}
+	if err := json.NewDecoder(r.Body).Decode(userUpdateRequest); err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "USER_UPDATE_INVALID_FIELDS")
+		return
+	}
+	userUpdateRequest.ID = userId
+
+	if err := h.UserUseCase.Update(userUpdateRequest); err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response.RenderSuccess(w, r, http.StatusOK, "")
+}
