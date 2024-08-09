@@ -56,6 +56,10 @@
     {
       "code": "USER_UPDATE_INVALID_FIELDS",
       "text": "Некорректные поля для обновления пользователя"
+    },
+    {
+      "code": "USER_UPDATE_USERNAME_ALREADY_EXIST",
+      "text": "Пользователь с таким именем уже существует"
     }
   ]
 }

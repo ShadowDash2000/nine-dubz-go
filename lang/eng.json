@@ -56,6 +56,10 @@
     {
       "code": "USER_UPDATE_INVALID_FIELDS",
       "text": "Invalid user update fields"
+    },
+    {
+      "code": "USER_UPDATE_USERNAME_ALREADY_EXIST",
+      "text": "User with this username already exist"
     }
   ]
 }
