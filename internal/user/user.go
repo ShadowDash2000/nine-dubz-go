@@ -69,12 +69,12 @@ func (uc *UseCase) Register(user *User) (uint, error) {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return 0, errors.New("REGISTRATION_ALREADY_EXIST")
 		}
-		return 0, errors.New("REGISTRATION_INTERNAL_ERROR")
+		return 0, errors.New("INTERNAL_ERROR")
 	} else if userId > 0 {
 		return userId, nil
 	}
 
-	return 0, errors.New("REGISTRATION_INTERNAL_ERROR")
+	return 0, errors.New("INTERNAL_ERROR")
 }
 
 func (uc *UseCase) CheckUserWithNameExists(userName string) bool {
@@ -131,12 +131,20 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 	}
 	isCorrectType, _ := uc.FileUseCase.VerifyFileType(buff, []string{"image/jpeg", "image/png", "image/gif", "image/webp"})
 	if !isCorrectType {
-		return errors.New("invalid file type")
+		return errors.New("USER_UPDATE_PICTURE_INVALID_TYPE")
+	}
+
+	user, err := uc.UserInteractor.GetById(userId)
+	if err != nil {
+		return errors.New("USER_NOT_FOUND")
+	}
+	if user.Picture != nil {
+		uc.FileUseCase.RemoveFile(user.Picture.Name)
 	}
 
 	picture, err := uc.FileUseCase.SaveFile(file, header.Filename, header.Size, "public")
 	if err != nil {
-		return err
+		return errors.New("INTERNAL_ERROR")
 	}
 
 	err = uc.UserInteractor.Updates(&User{
@@ -144,7 +152,7 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 		Picture: picture,
 	})
 	if err != nil {
-		return err
+		return errors.New("INTERNAL_ERROR")
 	}
 
 	return nil
@@ -170,7 +178,7 @@ func (uc *UseCase) Update(user *UpdateRequest) error {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return errors.New("USER_UPDATE_USERNAME_ALREADY_EXIST")
 		}
-		return errors.New("REGISTRATION_INTERNAL_ERROR")
+		return errors.New("INTERNAL_ERROR")
 	}
 
 	return nil

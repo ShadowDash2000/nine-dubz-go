@@ -93,7 +93,7 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.RenderError(w, r, http.StatusInternalServerError, "REGISTRATION_INTERNAL_ERROR")
+	response.RenderError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR")
 }
 
 func (h *Handler) SendRegistrationEmail(r *http.Request, user *User) {
@@ -181,7 +181,7 @@ func (h *Handler) ConfirmRegistrationHandler(w http.ResponseWriter, r *http.Requ
 func (h *Handler) UpdatePictureHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
 		if errors.Is(err, multipart.ErrMessageTooLarge) {
-			response.RenderError(w, r, http.StatusBadRequest, "File is too large")
+			response.RenderError(w, r, http.StatusBadRequest, "FILE_TOO_LARGE")
 			return
 		}
 
@@ -197,9 +197,11 @@ func (h *Handler) UpdatePictureHandler(w http.ResponseWriter, r *http.Request) {
 
 	userId := r.Context().Value("userId").(uint)
 	if err = h.UserUseCase.UpdatePicture(userId, file, fileHeader); err != nil {
-		response.RenderError(w, r, http.StatusBadRequest, "Failed to update picture")
+		response.RenderError(w, r, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	response.RenderSuccess(w, r, http.StatusOK, "")
 }
 
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
