@@ -55,6 +55,7 @@ func NewGetResponse(comment *Comment) *GetResponse {
 
 type GetSubCommentResponse struct {
 	ID        uint                    `json:"id"`
+	ParentID  *uint                   `json:"parentId"`
 	CreatedAt time.Time               `json:"createdAt"`
 	Text      string                  `json:"text"`
 	Mentions  []Mention               `json:"mentions,omitempty"`
@@ -64,6 +65,7 @@ type GetSubCommentResponse struct {
 func NewGetSubCommentResponse(comment *Comment) *GetSubCommentResponse {
 	response := &GetSubCommentResponse{
 		ID:        comment.ID,
+		ParentID:  comment.ParentID,
 		CreatedAt: comment.CreatedAt,
 		Text:      comment.Text,
 		Mentions:  comment.Mentions,
