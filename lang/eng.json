@@ -26,7 +26,7 @@
       "text": "Invalid fields"
     },
     {
-      "code": "REGISTRATION_INTERNAL_ERROR",
+      "code": "INTERNAL_ERROR",
       "text": "Internal error"
     },
     {
@@ -60,6 +60,18 @@
     {
       "code": "USER_UPDATE_USERNAME_ALREADY_EXIST",
       "text": "User with this username already exist"
+    },
+    {
+      "code": "USER_UPDATE_PICTURE_INVALID_TYPE",
+      "text": "Invalid file type, supported: jpeg, png, gif, webp"
+    },
+    {
+      "code": "USER_NOT_FOUND",
+      "text": "User not found"
+    },
+    {
+      "code": "FILE_TOO_LARGE",
+      "text": "File too large"
     }
   ]
 }

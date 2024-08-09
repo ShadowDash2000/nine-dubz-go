@@ -26,7 +26,7 @@
       "text": "Некорректные поля"
     },
     {
-      "code": "REGISTRATION_INTERNAL_ERROR",
+      "code": "INTERNAL_ERROR",
       "text": "Внутренняя ошибка"
     },
     {
@@ -60,6 +60,18 @@
     {
       "code": "USER_UPDATE_USERNAME_ALREADY_EXIST",
       "text": "Пользователь с таким именем уже существует"
+    },
+    {
+      "code": "USER_UPDATE_PICTURE_INVALID_TYPE",
+      "text": "Недопустимый формат файла, поддерживаются: jpeg, png, gif, webp"
+    },
+    {
+      "code": "USER_NOT_FOUND",
+      "text": "Пользователь не найден"
+    },
+    {
+      "code": "FILE_TOO_LARGE",
+      "text": "Файл слишком большой"
     }
   ]
 }
