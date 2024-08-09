@@ -167,6 +167,9 @@ func (uc *UseCase) Update(user *UpdateRequest) error {
 
 	err := uc.UserInteractor.Updates(NewUpdateRequest(user))
 	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return errors.New("USER_UPDATE_USERNAME_ALREADY_EXIST")
+		}
 		return errors.New("REGISTRATION_INTERNAL_ERROR")
 	}
 
