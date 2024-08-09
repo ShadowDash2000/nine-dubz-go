@@ -74,12 +74,12 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 	return uc.CommentInteractor.Create(comment)
 }
 
-func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentId uint, paginationMain *pagination.Pagination) (*[]GetSubCommentResponse, error) {
-	if paginationMain.Limit > 10 {
-		paginationMain.Limit = 10
+func (uc *UseCase) GetMultipleSubComments(userId *uint, movieCode string, parentId uint, pagination *pagination.Pagination) (*[]GetSubCommentResponse, error) {
+	if pagination.Limit > 10 {
+		pagination.Limit = 10
 	}
 
-	movieResponse, err := uc.MovieUseCase.Get(&userId, movieCode)
+	movieResponse, err := uc.MovieUseCase.Get(userId, movieCode)
 	if err != nil {
 		return nil, err
 	}
@@ -90,12 +90,7 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 			"parent_id": parentId,
 		},
 		"created_at asc",
-		"",
-		paginationMain,
-		&pagination.Pagination{
-			Limit:  -1,
-			Offset: -1,
-		},
+		pagination,
 	)
 	if err != nil {
 		return nil, err
@@ -109,9 +104,9 @@ func (uc *UseCase) GetMultipleSubComments(userId uint, movieCode string, parentI
 	return NewGetMultipleSubCommentResponse(&comments), nil
 }
 
-func (uc *UseCase) GetMultiple(userId *uint, movieCode string, paginationMain *pagination.Pagination, sort *sorting.Sort) (*GetMultipleResponse, error) {
-	if paginationMain.Limit > 20 {
-		paginationMain.Limit = 20
+func (uc *UseCase) GetMultiple(userId *uint, movieCode string, pagination *pagination.Pagination, sort *sorting.Sort) (*GetMultipleResponse, error) {
+	if pagination.Limit > 20 {
+		pagination.Limit = 20
 	}
 
 	if !slices.Contains([]string{"created_at"}, sort.SortBy) {
@@ -130,12 +125,7 @@ func (uc *UseCase) GetMultiple(userId *uint, movieCode string, paginationMain *p
 			"parent_id": nil,
 		},
 		fmt.Sprintf("%s %s", sort.SortBy, sort.SortVal),
-		"created_at asc",
-		paginationMain,
-		&pagination.Pagination{
-			Limit:  10,
-			Offset: 0,
-		},
+		pagination,
 	)
 	if err != nil {
 		return nil, err

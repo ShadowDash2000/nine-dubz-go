@@ -25,19 +25,11 @@ func (r *Repository) GetDistinctMultiple(where, distinct interface{}) ([]Comment
 	return comments, result.Error
 }
 
-func (r *Repository) GetMultiple(where interface{}, order, orderSub string, pagination, paginationSub *pagination.Pagination) ([]Comment, error) {
+func (r *Repository) GetMultiple(where interface{}, order string, pagination *pagination.Pagination) ([]Comment, error) {
 	var comments []Comment
 	result := r.DB.
 		Preload("User").
 		Preload("User.Picture").
-		Preload("SubComments", func(db *gorm.DB) *gorm.DB {
-			return db.
-				Order(orderSub).
-				Limit(paginationSub.Limit).
-				Offset(paginationSub.Offset)
-		}).
-		Preload("SubComments.User").
-		Preload("SubComments.User.Picture").
 		Where(where).
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
