@@ -30,23 +30,23 @@ func New(db *gorm.DB, muc *movie.UseCase, uuc *user.UseCase) *UseCase {
 	}
 }
 
-func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) error {
+func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) (*AddResponse, error) {
 	var parentCommentId uint
 	if len(options) > 0 {
 		parentCommentId = options[0]
 	}
 
 	if utf8.RuneCountInString(text) == 0 {
-		return errors.New("comment text is required")
+		return nil, errors.New("comment text is required")
 	}
 
 	if utf8.RuneCountInString(text) > 5000 {
-		return errors.New("comment text too long")
+		return nil, errors.New("comment text too long")
 	}
 
 	movieResponse, err := uc.MovieUseCase.Get(&userId, movieCode)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	comment := &Comment{
@@ -61,17 +61,36 @@ func (uc *UseCase) Add(userId uint, movieCode, text string, options ...uint) err
 			[]string{"parent_id"},
 		)
 		if err != nil {
-			return err
+			return nil, err
 		} else if len(parentComments) > 0 {
 			if parentComments[0].ParentID != nil {
-				return errors.New("parent comment already exists")
+				return nil, errors.New("parent comment already exists")
 			}
 		}
 
 		comment.ParentID = &parentCommentId
 	}
 
-	return uc.CommentInteractor.Create(comment)
+	err = uc.CommentInteractor.Create(comment)
+	if err != nil {
+		return nil, err
+	}
+
+	comments, err := uc.CommentInteractor.GetMultiple(
+		map[string]interface{}{"id": comment.ID},
+		"",
+		&pagination.Pagination{
+			Limit:  1,
+			Offset: -1,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = uc.Format(&comments)
+
+	return NewAddResponse(&comments[0]), nil
 }
 
 func (uc *UseCase) GetMultipleSubComments(userId *uint, movieCode string, parentId uint, pagination *pagination.Pagination) (*[]GetSubCommentResponse, error) {
