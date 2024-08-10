@@ -30,6 +30,28 @@ type AddRequest struct {
 	Text string `json:"text"`
 }
 
+type AddResponse struct {
+	ID        uint                    `json:"id"`
+	ParentID  *uint                   `json:"parentId,omitempty"`
+	CreatedAt time.Time               `json:"createdAt"`
+	Text      string                  `json:"text"`
+	Mentions  []Mention               `json:"mentions,omitempty"`
+	User      *user.GetPublicResponse `json:"user"`
+}
+
+func NewAddResponse(comment *Comment) *AddResponse {
+	response := &AddResponse{
+		ID:        comment.ID,
+		ParentID:  comment.ParentID,
+		CreatedAt: comment.CreatedAt,
+		Text:      comment.Text,
+		Mentions:  comment.Mentions,
+		User:      user.NewGetPublicResponse(&comment.User),
+	}
+
+	return response
+}
+
 type GetResponse struct {
 	ID               uint                    `json:"id"`
 	CreatedAt        time.Time               `json:"createdAt"`
