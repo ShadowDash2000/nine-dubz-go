@@ -8,7 +8,7 @@ import (
 
 type Video struct {
 	gorm.Model
-	ID        uint   `json:"-"`
+	ID        uint
 	QualityID uint   `json:"-"`
 	Title     string `gorm:"-"`
 	Width     int
@@ -34,7 +34,7 @@ func NewGetResponse(video Video) *GetResponse {
 }
 
 func NewGetResponseMultiple(videos []Video) []*GetResponse {
-	var response []*GetResponse
+	response := make([]*GetResponse, 0)
 	for _, video := range videos {
 		response = append(response, NewGetResponse(video))
 	}

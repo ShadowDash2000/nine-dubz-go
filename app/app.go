@@ -7,7 +7,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/go-chi/render"
-	"golang.org/x/net/html"
 	"gorm.io/gorm"
 	"log"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"nine-dubz/internal/googleoauth"
 	"nine-dubz/internal/mail"
 	"nine-dubz/internal/movie"
+	"nine-dubz/internal/public"
 	"nine-dubz/internal/response"
 	"nine-dubz/internal/role"
 	"nine-dubz/internal/seo"
@@ -26,7 +26,6 @@ import (
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -67,6 +66,7 @@ func (app *App) Start() {
 	ta := tokenauthorize.New(tokenSecretKey, "nine-dubz")
 
 	// Http handlers
+	ph := public.NewHandler(seouc)
 	uh := user.NewHandler(uuc, tuc, ta)
 	fh := file.NewHandler(fuc)
 	mh := movie.NewHandler(movuc, uh, fuc, ta, tuc)
@@ -105,35 +105,13 @@ func (app *App) Start() {
 		})
 	})
 
-	distPath, ok := os.LookupEnv("DIST_PATH")
-	if !ok {
-		distPath = "public/dist"
-	}
-
-	app.Router.Route("/assets", func(r chi.Router) {
-		fs := http.FileServer(http.Dir(filepath.Join(distPath, "assets")))
-		r.Method("GET", "/*", http.StripPrefix("/assets/", fs))
-	})
-
-	app.Router.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		file, err := os.Open(filepath.Join(distPath, "index.html"))
-		if err != nil {
-			response.RenderError(w, r, http.StatusInternalServerError, "")
-			return
-		}
-
-		document, err := html.Parse(file)
-		if err != nil {
-			response.RenderError(w, r, http.StatusInternalServerError, "")
-			return
-		}
-
-		seouc.SetSeo(r, document)
-
-		html.Render(w, document)
-	})
+	ph.Routes(app.Router)
 
 	app.Router.Route("/api", func(r chi.Router) {
+		r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+			response.RenderError(w, r, http.StatusNotFound, "not found")
+		})
+
 		uh.Routes(r)
 		fh.Routes(r)
 		mh.Routes(r)
