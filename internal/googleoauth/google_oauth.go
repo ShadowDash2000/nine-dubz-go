@@ -86,7 +86,13 @@ func (uc *UseCase) Register(registrationRequest *UserRegistrationRequest) (uint,
 				body, err := io.ReadAll(resp.Body)
 				if err == nil {
 					bodyReader := bytes.NewReader(body)
-					picture, err := uc.FileUseCase.SaveFile(bodyReader, "google_img."+pictureExt[1], int64(pictureSize), "public")
+					picture, err := uc.FileUseCase.Create(
+						bodyReader,
+						"google_img."+pictureExt[1],
+						"user/google/"+registrationRequest.Id,
+						int64(pictureSize),
+						"public",
+					)
 					if err == nil {
 						registrationPayload.Picture = picture
 					}

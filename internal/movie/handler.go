@@ -3,7 +3,6 @@ package movie
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/gorilla/websocket"
@@ -139,10 +138,7 @@ func (h *Handler) UploadVideoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.MovieUseCase.SaveVideo(*userId, header, conn)
-	if err != nil {
-		fmt.Println(err)
-	}
+	h.MovieUseCase.UploadVideo(header, conn)
 }
 
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +257,12 @@ func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId").(uint)
 	movieCode := chi.URLParam(r, "movieCode")
 
-	if err := h.MovieUseCase.Delete(userId, movieCode); err != nil {
+	if ok := h.MovieUseCase.IsMovieOwner(userId, movieCode); !ok {
+		response.RenderError(w, r, http.StatusForbidden, "Permission denied")
+		return
+	}
+
+	if err := h.MovieUseCase.Delete(movieCode); err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
@@ -307,34 +308,27 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 	requestRange := r.Header.Get("Range")
 	userId := r.Context().Value("userId").(*uint)
 
-	movie, err := h.MovieUseCase.CheckMovieAccess(userId, movieCode)
-	if err != nil {
+	if ok := h.MovieUseCase.CheckMovieAccess(userId, movieCode); !ok {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
 
-	video := movie.Video
-	switch quality {
-	case "240":
-		video = movie.VideoShakal
-		break
-	case "360":
-		video = movie.Video360
-		break
-	case "480":
-		video = movie.Video480
-		break
-	case "720":
-		video = movie.Video720
-		break
+	movie, _ := h.MovieUseCase.Get(userId, movieCode)
+
+	var file *file.File
+	for _, video := range movie.Videos {
+		if video.Title != nil && *video.Title == quality {
+			file = video.File
+			break
+		}
 	}
 
-	if video == nil {
+	if file == nil {
 		response.RenderError(w, r, http.StatusNotFound, "No such quality")
 		return
 	}
 
-	buff, contentRange, contentLength, err := h.FileUseCase.StreamFile(video.File.Name, requestRange)
+	buff, contentRange, contentLength, err := h.FileUseCase.Stream(file.Name+file.Extension, file.Path, requestRange)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "File not found")
 		return

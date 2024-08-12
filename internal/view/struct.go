@@ -7,7 +7,7 @@ import (
 
 type View struct {
 	gorm.Model
-	MovieID *uint
+	MovieID uint
 	UserID  *uint
 	User    user.User
 	IP      string

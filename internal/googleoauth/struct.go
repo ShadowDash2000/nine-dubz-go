@@ -46,6 +46,7 @@ func NewUserLoginRequest(userLoginRequest *UserLoginRequest) *user.User {
 }
 
 type UserRegistrationRequest struct {
+	Id         string
 	Name       string
 	Email      string
 	PictureUrl string

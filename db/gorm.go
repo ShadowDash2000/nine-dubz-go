@@ -13,6 +13,7 @@ import (
 	"nine-dubz/internal/role"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
+	"nine-dubz/internal/video"
 	"nine-dubz/internal/view"
 	"os"
 )
@@ -53,9 +54,10 @@ func NewGormDb() *gorm.DB {
 		&apimethod.ApiMethod{},
 		&token.Token{},
 		&googleoauth.AuthorizeState{},
-		&movie.Movie{},
+		&video.Video{},
 		&comment.Comment{},
 		&view.View{},
+		&movie.Movie{},
 	)
 
 	var count int64

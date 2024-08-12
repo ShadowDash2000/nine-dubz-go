@@ -50,7 +50,7 @@ func (r *Repository) Count(where interface{}) (int64, error) {
 }
 
 func (r *Repository) Delete(commentId, userId uint) (int64, error) {
-	result := r.DB.Where("user_id = ?", userId).Delete(&Comment{}, commentId)
+	result := r.DB.Select("SubComments").Where("user_id = ?", userId).Delete(&Comment{ID: commentId})
 
 	return result.RowsAffected, result.Error
 }

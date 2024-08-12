@@ -19,7 +19,7 @@ func NewHandler(uc *UseCase) *Handler {
 func (h *Handler) GetFile(w http.ResponseWriter, r *http.Request) {
 	fileName := chi.URLParam(r, "fileName")
 
-	buff, err := h.FileUseCase.GetFile(fileName)
+	buff, err := h.FileUseCase.Get(fileName)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "No such file")
 		return

@@ -3,31 +3,25 @@ package file
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
 	"io"
-	"math/rand"
 	"net/http"
 	"nine-dubz/pkg/s3storage"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type UseCase struct {
 	FileInteractor Interactor
-	S3Storage      *s3storage.S3Storage
 }
 
 func New(db *gorm.DB) *UseCase {
 	return &UseCase{
 		FileInteractor: &Repository{
-			DB: db,
+			DB:        db,
+			S3Storage: s3storage.NewS3Storage(),
 		},
-		S3Storage: s3storage.NewS3Storage(),
 	}
 }
 
@@ -46,96 +40,36 @@ func (uc *UseCase) UpgradeConnection(w http.ResponseWriter, r *http.Request) (*w
 	return connection, nil
 }
 
-func (uc *UseCase) StreamFile(fileName, requestRange string) ([]byte, string, int64, error) {
-	var off int
-	if len(requestRange) > 0 {
-		requestRange = strings.Replace(requestRange, "bytes=", "", -1)
-		requestRange = strings.Replace(requestRange, "-", "", -1)
-		off, _ = strconv.Atoi(requestRange)
-	} else {
-		off = 0
-	}
-
-	buff := make([]byte, 1024*1024*5)
-
-	contentRange := strconv.Itoa(off) + "-" + strconv.Itoa(len(buff)+off)
-	output, err := uc.S3Storage.GetRangeObject(fileName, "bytes="+contentRange)
-	if err != nil {
-		return nil, "", 0, err
-	}
-
-	contentRange = aws.ToString(output.ContentRange)
-	contentLength := aws.ToInt64(output.ContentLength)
-
-	buff, _ = io.ReadAll(output.Body)
-
-	return buff, contentRange, contentLength, nil
+func (uc *UseCase) Create(file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
+	return uc.FileInteractor.Create(file, name, path, size, fileType)
 }
 
-func (uc *UseCase) GetFile(fileName string) ([]byte, error) {
-	_, err := uc.FileInteractor.GetWhere(map[string]interface{}{
-		"name": fileName,
-		"type": "public",
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	output, err := uc.S3Storage.GetObject(fileName)
-	if err != nil {
-		return nil, err
-	}
-
-	buff, err := io.ReadAll(output.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return buff, nil
+func (uc *UseCase) Get(name string) ([]byte, error) {
+	return uc.FileInteractor.Get(name)
 }
 
-func (uc *UseCase) SaveFile(file io.ReadSeeker, fileName string, fileSize int64, fileType string) (*File, error) {
-	timeNow := time.Now().UnixNano()
-	randomNumber := rand.Intn(1000)
-
-	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
-	extension := filepath.Ext(fileName)
-
-	_, err := uc.S3Storage.PutObject(file, newFileName)
-	if err != nil {
-		return nil, err
-	}
-
-	savedFile, err := uc.FileInteractor.Add(&File{
-		Name:         newFileName,
-		Extension:    extension,
-		OriginalName: fileName,
-		Size:         fileSize,
-		Type:         fileType,
-	})
-	if err != nil {
-		uc.S3Storage.DeleteObject(newFileName)
-		return nil, err
-	}
-
-	return savedFile, nil
+func (uc *UseCase) Stream(name, path, requestRange string) ([]byte, string, int64, error) {
+	return uc.FileInteractor.Stream(name, path, requestRange)
 }
 
-func (uc *UseCase) RemoveFile(fileName string) error {
-	_, err := uc.S3Storage.DeleteObject(fileName)
-	if err != nil {
-		return err
-	}
+func (uc *UseCase) Delete(name string) error {
+	return uc.FileInteractor.Delete(name)
+}
 
-	return uc.FileInteractor.Remove(fileName)
+func (uc *UseCase) DeleteMultiple(names []string, path string) error {
+	return uc.FileInteractor.DeleteMultiple(names, path)
+}
+
+func (uc *UseCase) DeleteAllInPath(path string) error {
+	return uc.FileInteractor.DeleteAllInPath(path)
 }
 
 func (uc *UseCase) VerifyFileType(buff []byte, types []string) (bool, string) {
 	return uc.FileInteractor.VerifyFileType(buff, types)
 }
 
-func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, conn *websocket.Conn) (*os.File, error) {
-	tmpFile, err := uc.FileInteractor.WriteFileFromSocket("upload/tmp", fileTypes, fileSize, 1024*1024, conn)
+func (uc *UseCase) WriteFileFromSocket(filePath, fileName string, fileTypes []string, fileSize int, conn *websocket.Conn) (*os.File, error) {
+	tmpFile, err := uc.FileInteractor.WriteFileFromSocket(filePath, fileName, fileTypes, fileSize, 1024*1024, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -148,12 +82,12 @@ func (uc *UseCase) WriteFileFromSocket(fileTypes []string, fileSize int, conn *w
 	return tmpFile, nil
 }
 
-func (uc *UseCase) DownloadFile(path, name string, file *File) (*os.File, error) {
-	err := os.MkdirAll(path, os.ModePerm)
+func (uc *UseCase) DownloadFile(pathTo, name, pathFrom string, file *File) (*os.File, error) {
+	err := os.MkdirAll(pathTo, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
-	tmpFile, err := os.Create(filepath.Join(path, name))
+	tmpFile, err := os.Create(filepath.Join(pathTo, name))
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +100,7 @@ func (uc *UseCase) DownloadFile(path, name string, file *File) (*os.File, error)
 		}
 
 		requestRange := fmt.Sprintf("bytes=%d-", currentByte)
-		buff, _, contentLength, err := uc.StreamFile(file.Name, requestRange)
+		buff, _, contentLength, err := uc.Stream(file.Name+file.Extension, pathFrom, requestRange)
 		if err != nil {
 			tmpFile.Close()
 			os.Remove(tmpFile.Name())

@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"fmt"
 	"gorm.io/gorm"
 	"io"
 	"mime/multipart"
@@ -139,10 +140,11 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 		return errors.New("USER_NOT_FOUND")
 	}
 	if user.Picture != nil {
-		uc.FileUseCase.RemoveFile(user.Picture.Name)
+		uc.FileUseCase.Delete(user.Picture.Name)
 	}
 
-	picture, err := uc.FileUseCase.SaveFile(file, header.Filename, header.Size, "public")
+	pictureSavePath := fmt.Sprintf("user/inner/%d", userId)
+	picture, err := uc.FileUseCase.Create(file, header.Filename, pictureSavePath, header.Size, "public")
 	if err != nil {
 		return errors.New("INTERNAL_ERROR")
 	}

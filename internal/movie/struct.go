@@ -5,53 +5,34 @@ import (
 	"mime/multipart"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
+	"nine-dubz/internal/video"
 	"nine-dubz/internal/view"
 	"time"
 )
 
 type Movie struct {
 	gorm.Model
-	ID                   uint       `json:"ID"`
-	Status               string     `json:"-" gorm:"default:'uploading'"`
-	CreatedAt            time.Time  `json:"createdAt"`
-	Code                 string     `json:"code"`
-	IsPublished          bool       `json:"-" gorm:"default:false"`
-	Description          string     `json:"description"`
-	PreviewId            *uint      `json:"-"`
-	Preview              *file.File `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
-	PreviewWebpId        *uint      `json:"-"`
-	PreviewWebp          *file.File `json:"previewWebp,omitempty" gorm:"foreignKey:PreviewWebpId;references:ID;"`
-	DefaultPreviewId     *uint      `json:"-"`
-	DefaultPreview       *file.File `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
-	DefaultPreviewWebpId *uint      `json:"-"`
-	DefaultPreviewWebp   *file.File `json:"defaultPreviewWebp" gorm:"foreignKey:DefaultPreviewWebpId;references:ID;"`
-	Name                 string     `json:"name"`
-	VideoTmpId           *uint      `json:"-"`
-	VideoTmp             *Video     `json:"-" gorm:"foreignKey:VideoTmpId;references:ID;"`
-	VideoId              *uint      `json:"-"`
-	Video                *Video     `json:"video" gorm:"foreignKey:VideoId;references:ID;"`
-	VideoShakalId        *uint      `json:"-"`
-	VideoShakal          *Video     `json:"videoShakal" gorm:"foreignKey:VideoShakalId;references:ID;"`
-	Video360Id           *uint      `json:"-"`
-	Video360             *Video     `json:"video360" gorm:"foreignKey:Video360Id;references:ID;"`
-	Video480Id           *uint      `json:"-"`
-	Video480             *Video     `json:"video480" gorm:"foreignKey:Video480Id;references:ID;"`
-	Video720Id           *uint      `json:"-"`
-	Video720             *Video     `json:"video720" gorm:"foreignKey:Video720Id;references:ID;"`
-	UserId               uint       `json:"-"`
-	User                 user.User  `json:"-" gorm:"foreignKey:UserId;references:ID"`
-	WebVttId             *uint      `json:"-"`
-	WebVtt               *file.File `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
-	WebVttImages         string     `json:"-"`
+	ID                   uint          `json:"ID"`
+	Status               string        `json:"-" gorm:"default:'uploading'"`
+	CreatedAt            time.Time     `json:"createdAt"`
+	Code                 string        `json:"code"`
+	IsPublished          bool          `json:"-" gorm:"default:false"`
+	Description          string        `json:"description"`
+	PreviewId            *uint         `json:"-"`
+	Preview              *file.File    `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
+	PreviewWebpId        *uint         `json:"-"`
+	PreviewWebp          *file.File    `json:"previewWebp,omitempty" gorm:"foreignKey:PreviewWebpId;references:ID;"`
+	DefaultPreviewId     *uint         `json:"-"`
+	DefaultPreview       *file.File    `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
+	DefaultPreviewWebpId *uint         `json:"-"`
+	DefaultPreviewWebp   *file.File    `json:"defaultPreviewWebp" gorm:"foreignKey:DefaultPreviewWebpId;references:ID;"`
+	Name                 string        `json:"name"`
+	Videos               []video.Video `gorm:"many2many:movie_videos"`
+	UserId               uint          `json:"-"`
+	User                 user.User     `json:"-" gorm:"foreignKey:UserId;references:ID"`
+	WebVttId             *uint         `json:"-"`
+	WebVtt               *file.File    `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 	Views                []view.View
-}
-
-type Video struct {
-	gorm.Model `json:"-"`
-	Width      int        `json:"width"`
-	Height     int        `json:"height"`
-	FileID     uint       `json:"-"`
-	File       *file.File `json:"file"`
 }
 
 type VideoUploadHeader struct {
@@ -91,11 +72,7 @@ type GetResponse struct {
 	DefaultPreview     *file.File              `json:"defaultPreview"`
 	DefaultPreviewWebp *file.File              `json:"defaultPreviewWebp"`
 	Name               string                  `json:"name"`
-	Video              *Video                  `json:"video"`
-	VideoShakal        *Video                  `json:"videoShakal"`
-	Video360           *Video                  `json:"video360"`
-	Video480           *Video                  `json:"video480"`
-	Video720           *Video                  `json:"video720"`
+	Videos             []*video.GetResponse    `json:"videos"`
 	WebVtt             *file.File              `json:"webVtt"`
 	User               *user.GetPublicResponse `json:"user"`
 	Views              int64                   `json:"views"`
@@ -112,27 +89,23 @@ func NewGetResponse(movie *Movie) *GetResponse {
 		DefaultPreview:     movie.DefaultPreview,
 		DefaultPreviewWebp: movie.DefaultPreviewWebp,
 		Name:               movie.Name,
-		Video:              movie.Video,
-		VideoShakal:        movie.VideoShakal,
-		Video360:           movie.Video360,
-		Video480:           movie.Video480,
-		Video720:           movie.Video720,
+		Videos:             video.NewGetResponseMultiple(movie.Videos),
 		WebVtt:             movie.WebVtt,
 		User:               user.NewGetPublicResponse(&movie.User),
 	}
 }
 
 type GetForUserResponse struct {
-	IsPublished        bool       `json:"isPublished"`
-	Code               string     `json:"code"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	Description        string     `json:"description"`
-	Preview            *file.File `json:"preview"`
-	PreviewWebp        *file.File `json:"previewWebp"`
-	DefaultPreview     *file.File `json:"defaultPreview"`
-	DefaultPreviewWebp *file.File `json:"defaultPreviewWebp"`
-	Name               string     `json:"name"`
-	Video              *Video     `json:"video"`
+	IsPublished        bool                 `json:"isPublished"`
+	Code               string               `json:"code"`
+	CreatedAt          time.Time            `json:"createdAt"`
+	Description        string               `json:"description"`
+	Preview            *file.File           `json:"preview"`
+	PreviewWebp        *file.File           `json:"previewWebp"`
+	DefaultPreview     *file.File           `json:"defaultPreview"`
+	DefaultPreviewWebp *file.File           `json:"defaultPreviewWebp"`
+	Name               string               `json:"name"`
+	Videos             []*video.GetResponse `json:"videos"`
 }
 
 func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
@@ -146,7 +119,7 @@ func NewGetForUserResponse(movie *Movie) *GetForUserResponse {
 		DefaultPreview:     movie.DefaultPreview,
 		DefaultPreviewWebp: movie.DefaultPreviewWebp,
 		Name:               movie.Name,
-		Video:              movie.Video,
+		Videos:             video.NewGetResponseMultiple(movie.Videos),
 	}
 }
 
@@ -154,16 +127,9 @@ type VideoUpdateRequest struct {
 	Status             string     `json:"-"`
 	Name               string     `json:"name"`
 	Code               string     `json:"code"`
-	VideoTmp           *Video     `json:"-"`
-	Video              *Video     `json:"video"`
-	VideoShakal        *Video     `json:"videoShakal"`
-	Video360           *Video     `json:"video360"`
-	Video480           *Video     `json:"video480"`
-	Video720           *Video     `json:"video720"`
 	DefaultPreview     *file.File `json:"defaultPreview"`
 	DefaultPreviewWebp *file.File `json:"defaultPreviewWebp"`
 	WebVtt             *file.File `json:"webVtt"`
-	WebVttImages       string     `json:"-"`
 }
 
 func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
@@ -171,16 +137,9 @@ func NewVideoUpdateRequest(movie *VideoUpdateRequest) *Movie {
 		Status:             movie.Status,
 		Name:               movie.Name,
 		Code:               movie.Code,
-		VideoTmp:           movie.VideoTmp,
-		Video:              movie.Video,
-		VideoShakal:        movie.VideoShakal,
-		Video360:           movie.Video360,
-		Video480:           movie.Video480,
-		Video720:           movie.Video720,
 		DefaultPreview:     movie.DefaultPreview,
 		DefaultPreviewWebp: movie.DefaultPreviewWebp,
 		WebVtt:             movie.WebVtt,
-		WebVttImages:       movie.WebVttImages,
 	}
 }
 

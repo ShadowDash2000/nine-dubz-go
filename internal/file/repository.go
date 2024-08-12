@@ -3,30 +3,133 @@ package file
 import (
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
 	"gorm.io/gorm"
+	"io"
+	"math/rand"
 	"net/http"
+	"nine-dubz/pkg/s3storage"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type Repository struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	S3Storage *s3storage.S3Storage
 }
 
-func (fr *Repository) Add(file *File) (*File, error) {
-	result := fr.DB.Create(&file)
+func (fr *Repository) Create(file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
+	timeNow := time.Now().UnixNano()
+	randomNumber := rand.Intn(1000)
 
-	return file, result.Error
+	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
+	extension := filepath.Ext(name)
+
+	_, err := fr.S3Storage.PutObject(file, newFileName+extension, path)
+	if err != nil {
+		return nil, err
+	}
+
+	savedFile := &File{
+		Name:         newFileName,
+		Extension:    extension,
+		OriginalName: name,
+		Size:         size,
+		Path:         path,
+		Type:         fileType,
+	}
+	result := fr.DB.Create(&savedFile)
+	if result.Error != nil {
+		fr.S3Storage.DeleteObject(newFileName, path)
+		return nil, err
+	}
+
+	return savedFile, result.Error
 }
 
-func (fr *Repository) Remove(name string) error {
+func (fr *Repository) Get(name string) ([]byte, error) {
+	file, err := fr.GetWhere(map[string]interface{}{
+		"name": name,
+		"type": "public",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := fr.S3Storage.GetObject(name+file.Extension, file.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	buff, err := io.ReadAll(output.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return buff, nil
+}
+
+func (fr *Repository) Stream(name, path, requestRange string) ([]byte, string, int64, error) {
+	var off int
+	if len(requestRange) > 0 {
+		requestRange = strings.Replace(requestRange, "bytes=", "", -1)
+		requestRange = strings.Replace(requestRange, "-", "", -1)
+		off, _ = strconv.Atoi(requestRange)
+	} else {
+		off = 0
+	}
+
+	buff := make([]byte, 1024*1024*5)
+
+	contentRange := strconv.Itoa(off) + "-" + strconv.Itoa(len(buff)+off)
+	output, err := fr.S3Storage.GetRangeObject(name, path, "bytes="+contentRange)
+	if err != nil {
+		return nil, "", 0, err
+	}
+
+	contentRange = aws.ToString(output.ContentRange)
+	contentLength := aws.ToInt64(output.ContentLength)
+
+	buff, _ = io.ReadAll(output.Body)
+
+	return buff, contentRange, contentLength, nil
+}
+
+func (fr *Repository) Delete(name string) error {
+	file, err := fr.GetWhere(map[string]interface{}{"name": name})
+	if err != nil {
+		return err
+	}
+
 	result := fr.DB.Delete(&File{}, "name = ?", name)
+
+	if result.Error == nil {
+		fr.S3Storage.DeleteObject(name, file.Path)
+	}
 
 	return result.Error
 }
 
-func (fr *Repository) Save(file *File) error {
-	result := fr.DB.Save(&file)
+func (fr *Repository) DeleteMultiple(names []string, path string) error {
+	result := fr.DB.Delete(&File{}, "name IN ?", names)
+
+	if result.Error == nil {
+		fr.S3Storage.DeleteObjects(names, path)
+	}
+
+	return result.Error
+}
+
+func (fr *Repository) DeleteAllInPath(path string) error {
+	result := fr.DB.Delete(&File{}, "path = ?", path)
+
+	if result.Error == nil {
+		fr.S3Storage.DeleteAllInPrefix(path)
+	}
 
 	return result.Error
 }
@@ -35,13 +138,6 @@ func (fr *Repository) Updates(file *File) error {
 	result := fr.DB.Updates(&file)
 
 	return result.Error
-}
-
-func (fr *Repository) Get(id uint) (*File, error) {
-	file := &File{}
-	result := fr.DB.First(&file, id)
-
-	return file, result.Error
 }
 
 func (fr *Repository) GetWhere(where map[string]interface{}) (*File, error) {
@@ -70,13 +166,13 @@ const (
 	UploadStatusComplete  int = 2
 )
 
-func (fr *Repository) WriteFileFromSocket(tmpPath string, fileTypes []string, fileSize int, maxChunkSize int, conn *websocket.Conn) (*os.File, error) {
+func (fr *Repository) WriteFileFromSocket(tmpPath, fileName string, fileTypes []string, fileSize int, maxChunkSize int, conn *websocket.Conn) (*os.File, error) {
 	err := os.MkdirAll(tmpPath, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 
-	tmpFile, err := os.CreateTemp(tmpPath, "websocket_upload_")
+	tmpFile, err := os.Create(filepath.Join(tmpPath, fileName))
 	if err != nil {
 		fmt.Println("Could not create temp file: " + err.Error())
 		return nil, err
