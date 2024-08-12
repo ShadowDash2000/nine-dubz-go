@@ -124,7 +124,7 @@ func (uc *UseCase) GetMultipleSubComments(userId *uint, movieCode string, parent
 }
 
 func (uc *UseCase) GetMultiple(userId *uint, movieCode string, pagination *pagination.Pagination, sort *sorting.Sort) (*GetMultipleResponse, error) {
-	if pagination.Limit > 20 {
+	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
 	}
 
