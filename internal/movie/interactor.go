@@ -6,7 +6,7 @@ import (
 
 type Interactor interface {
 	Add(movie *Movie) error
-	Delete(userId uint, code string) error
+	Delete(id uint) error
 	Save(movie *Movie) error
 	Updates(movie *Movie) error
 	UpdatesWhere(movie *Movie, where map[string]interface{}) (int64, error)
@@ -14,7 +14,8 @@ type Interactor interface {
 	AppendAssociation(movie *Movie, association string, append interface{}) error
 	Get(code string) (*Movie, error)
 	GetUnscoped(code string) (*Movie, error)
-	GetWhere(code string, where map[string]interface{}) (*Movie, error)
+	GetWhere(where interface{}) (*Movie, error)
+	GetSelectWhere(selectQuery, where interface{}) (*Movie, error)
 	GetMultipleByUserId(userId uint, pagination *pagination.Pagination) (*[]Movie, error)
 	GetMultiple(pagination *pagination.Pagination, order string) (*[]Movie, error)
 	GetWhereMultiple(pagination *pagination.Pagination, where map[string]interface{}) (*[]Movie, error)

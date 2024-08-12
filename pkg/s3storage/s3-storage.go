@@ -7,7 +7,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"io"
+	"net/url"
 	"os"
 )
 
@@ -70,11 +72,15 @@ func (sr *S3Storage) GetS3Client() *s3.Client {
 	return client
 }
 
-func (sr *S3Storage) PutObject(file io.ReadSeeker, key string) (*s3.PutObjectOutput, error) {
+func (sr *S3Storage) PutObject(file io.ReadSeeker, key, prefix string) (*s3.PutObjectOutput, error) {
 	client := sr.GetS3Client()
+	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	if err != nil {
+		return nil, err
+	}
 
 	output, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(sr.Bucket),
+		Bucket: aws.String(path),
 		Key:    aws.String(key),
 		Body:   file,
 	})
@@ -90,11 +96,15 @@ func (sr *S3Storage) PutObject(file io.ReadSeeker, key string) (*s3.PutObjectOut
 	return output, nil
 }
 
-func (sr *S3Storage) GetRangeObject(key string, fileRange string) (*s3.GetObjectOutput, error) {
+func (sr *S3Storage) GetRangeObject(key, prefix, fileRange string) (*s3.GetObjectOutput, error) {
 	client := sr.GetS3Client()
+	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	if err != nil {
+		return nil, err
+	}
 
 	object, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(sr.Bucket),
+		Bucket: aws.String(path),
 		Key:    aws.String(key),
 		Range:  aws.String(fileRange),
 	})
@@ -105,11 +115,15 @@ func (sr *S3Storage) GetRangeObject(key string, fileRange string) (*s3.GetObject
 	return object, nil
 }
 
-func (sr *S3Storage) GetObject(key string) (*s3.GetObjectOutput, error) {
+func (sr *S3Storage) GetObject(key, prefix string) (*s3.GetObjectOutput, error) {
 	client := sr.GetS3Client()
+	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	if err != nil {
+		return nil, err
+	}
 
 	object, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(sr.Bucket),
+		Bucket: aws.String(path),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -119,12 +133,74 @@ func (sr *S3Storage) GetObject(key string) (*s3.GetObjectOutput, error) {
 	return object, nil
 }
 
-func (sr *S3Storage) DeleteObject(key string) (*s3.DeleteObjectOutput, error) {
+func (sr *S3Storage) DeleteAllInPrefix(prefix string) (*s3.DeleteObjectsOutput, error) {
 	client := sr.GetS3Client()
+	prefixPath, err := url.JoinPath(prefix, "/")
+	if err != nil {
+		return nil, err
+	}
+
+	listObject, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+		Bucket: aws.String(sr.Bucket),
+		Prefix: aws.String(prefixPath),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []types.ObjectIdentifier
+	for _, object := range listObject.Contents {
+		objects = append(objects, types.ObjectIdentifier{Key: object.Key})
+	}
+
+	deleteObjects, err := client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
+		Bucket: aws.String(sr.Bucket),
+		Delete: &types.Delete{
+			Objects: objects,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return deleteObjects, nil
+}
+
+func (sr *S3Storage) DeleteObject(key, prefix string) (*s3.DeleteObjectOutput, error) {
+	client := sr.GetS3Client()
+	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	if err != nil {
+		return nil, err
+	}
 
 	object, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(sr.Bucket),
+		Bucket: aws.String(path),
 		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (sr *S3Storage) DeleteObjects(keys []string, prefix string) (*s3.DeleteObjectsOutput, error) {
+	client := sr.GetS3Client()
+	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []types.ObjectIdentifier
+	for _, key := range keys {
+		objects = append(objects, types.ObjectIdentifier{Key: aws.String(key)})
+	}
+
+	object, err := client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
+		Bucket: aws.String(path),
+		Delete: &types.Delete{
+			Objects: objects,
+		},
 	})
 	if err != nil {
 		return nil, err

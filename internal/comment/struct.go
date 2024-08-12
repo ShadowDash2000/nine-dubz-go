@@ -9,6 +9,7 @@ import (
 
 type Comment struct {
 	gorm.Model
+	ID               uint
 	Text             string
 	Mentions         []Mention `gorm:"-"`
 	MovieID          uint      `gorm:"not null"`

@@ -15,10 +15,8 @@ func (mr *Repository) Add(movie *Movie) error {
 	return result.Error
 }
 
-func (mr *Repository) Delete(userId uint, code string) error {
-	result := mr.DB.Where("user_id = ? AND code = ?", userId, code).Delete(&Movie{})
-
-	return result.Error
+func (mr *Repository) Delete(id uint) error {
+	return mr.DB.Delete(&Movie{ID: id}).Error
 }
 
 func (mr *Repository) Save(movie *Movie) error {
@@ -52,18 +50,8 @@ func (mr *Repository) AppendAssociation(movie *Movie, association string, append
 func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
-		Preload("VideoTmp").
-		Preload("VideoTmp.File").
-		Preload("Video").
-		Preload("Video.File").
-		Preload("VideoShakal").
-		Preload("VideoShakal.File").
-		Preload("Video360").
-		Preload("Video360.File").
-		Preload("Video480").
-		Preload("Video480.File").
-		Preload("Video720").
-		Preload("Video720.File").
+		Preload("Videos").
+		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
 		Preload("DefaultPreview").
@@ -80,16 +68,8 @@ func (mr *Repository) GetUnscoped(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
 		Unscoped().
-		Preload("Video").
-		Preload("Video.File").
-		Preload("VideoShakal").
-		Preload("VideoShakal.File").
-		Preload("Video360").
-		Preload("Video360.File").
-		Preload("Video480").
-		Preload("Video480.File").
-		Preload("Video720").
-		Preload("Video720.File").
+		Preload("Videos").
+		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
 		Preload("DefaultPreview").
@@ -100,26 +80,25 @@ func (mr *Repository) GetUnscoped(code string) (*Movie, error) {
 	return movie, result.Error
 }
 
-func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movie, error) {
+func (mr *Repository) GetWhere(where interface{}) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
-		Preload("Video").
-		Preload("Video.File").
-		Preload("VideoShakal").
-		Preload("VideoShakal.File").
-		Preload("Video360").
-		Preload("Video360.File").
-		Preload("Video480").
-		Preload("Video480.File").
-		Preload("Video720").
-		Preload("Video720.File").
+		Preload("Videos").
+		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
 		Preload("DefaultPreview").
 		Preload("DefaultPreviewWebp").
 		Preload("WebVtt").
 		Where(where).
-		First(&movie, "code = ?", code)
+		First(&movie)
+
+	return movie, result.Error
+}
+
+func (mr *Repository) GetSelectWhere(selectQuery, where interface{}) (*Movie, error) {
+	movie := &Movie{}
+	result := mr.DB.Select(selectQuery).Where(where).First(&movie)
 
 	return movie, result.Error
 }
@@ -127,16 +106,8 @@ func (mr *Repository) GetWhere(code string, where map[string]interface{}) (*Movi
 func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pagination) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
-		Preload("Video").
-		Preload("Video.File").
-		Preload("VideoShakal").
-		Preload("VideoShakal.File").
-		Preload("Video360").
-		Preload("Video360.File").
-		Preload("Video480").
-		Preload("Video480.File").
-		Preload("Video720").
-		Preload("Video720.File").
+		Preload("Videos").
+		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
 		Preload("DefaultPreview").
@@ -153,16 +124,8 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 func (mr *Repository) GetMultiple(pagination *pagination.Pagination, order string) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
-		Preload("Video").
-		Preload("Video.File").
-		Preload("VideoShakal").
-		Preload("VideoShakal.File").
-		Preload("Video360").
-		Preload("Video360.File").
-		Preload("Video480").
-		Preload("Video480.File").
-		Preload("Video720").
-		Preload("Video720.File").
+		Preload("Videos").
+		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
 		Preload("DefaultPreview").
@@ -182,18 +145,8 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination, order strin
 func (mr *Repository) GetWhereMultiple(pagination *pagination.Pagination, where map[string]interface{}) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
-		Preload("VideoTmp").
-		Preload("VideoTmp.File").
-		Preload("Video").
-		Preload("Video.File").
-		Preload("VideoShakal").
-		Preload("VideoShakal.File").
-		Preload("Video360").
-		Preload("Video360.File").
-		Preload("Video480").
-		Preload("Video480.File").
-		Preload("Video720").
-		Preload("Video720.File").
+		Preload("Videos").
+		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
 		Preload("DefaultPreview").

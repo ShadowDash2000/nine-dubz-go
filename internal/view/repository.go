@@ -36,10 +36,10 @@ func (r *Repository) GetCountMultiple(movieIds []uint) (map[uint]int64, error) {
 
 	counts := make(map[uint]int64)
 	for _, view := range views {
-		if _, ok := counts[*view.MovieID]; ok {
-			counts[*view.MovieID] = counts[*view.MovieID] + 1
+		if _, ok := counts[view.MovieID]; ok {
+			counts[view.MovieID] = counts[view.MovieID] + 1
 		} else {
-			counts[*view.MovieID] = 1
+			counts[view.MovieID] = 1
 		}
 	}
 
