@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/alitto/pond"
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"io"
 	"log"
@@ -36,6 +37,7 @@ type UseCase struct {
 	VideoUseCase    *video.UseCase
 	FileUseCase     *file.UseCase
 	ViewUseCase     *view.UseCase
+	MoviePool       map[string]PoolItem
 }
 
 func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.UseCase, vuc *view.UseCase) *UseCase {
@@ -53,10 +55,24 @@ func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.Use
 		VideoUseCase: viduc,
 		FileUseCase:  fuc,
 		ViewUseCase:  vuc,
+		MoviePool:    make(map[string]PoolItem),
 	}
 }
 
 func (uc *UseCase) Add(movieAddRequest *AddRequest) (*AddResponse, error) {
+	// Limit max simultaneous uploads per user
+	count, err := uc.MovieInteractor.GetWhereCount(map[string]interface{}{
+		"user_id": movieAddRequest.UserId,
+		"status":  StatusUploading,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if count >= 3 {
+		return nil, errors.New("movie: too many movies")
+	}
+
 	movie := NewAddRequest(movieAddRequest)
 
 	hasher := sha256.New()
@@ -68,7 +84,7 @@ func (uc *UseCase) Add(movieAddRequest *AddRequest) (*AddResponse, error) {
 
 	movie.Code = encoded[:11]
 
-	err := uc.MovieInteractor.Add(movie)
+	err = uc.MovieInteractor.Add(movie)
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +101,10 @@ func (uc *UseCase) Delete(code string) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	if poolItem, ok := uc.MoviePool[code]; ok {
+		poolItem.Cancel()
 	}
 
 	err = uc.MovieInteractor.Delete(movie.ID)
@@ -127,9 +147,11 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 		return errors.New("failed to update video")
 	}
 
+	quality := video.GetQuality(1)
+
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket(
 		filepath.Join("upload/resize", movie.Code),
-		"tmp.webm",
+		quality.Code+".webm",
 		[]string{"video/mp4"},
 		header.Size,
 		conn,
@@ -139,8 +161,25 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 		return err
 	}
 
-	uc.Pool.Submit(func() {
-		uc.PostProcessVideo(*movie, tmpFile)
+	savedVideo, err := uc.VideoUseCase.Save(tmpFile.Name(), "movie/"+movie.Code, quality.ID)
+	if err != nil {
+		return err
+	}
+
+	err = uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Videos", savedVideo)
+	if err != nil {
+		return errors.New("failed to update video")
+	}
+
+	movie.Videos = append(movie.Videos, *savedVideo)
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	group, groupCtx := uc.Pool.GroupContext(ctx)
+	uc.MoviePool[movie.Code] = PoolItem{groupCtx, cancel}
+	group.Submit(func() error {
+		err = uc.PostProcessVideo(groupCtx, *movie, tmpFile)
+		delete(uc.MoviePool, movie.Code)
+		return err
 	})
 
 	return nil
@@ -150,7 +189,7 @@ func (uc *UseCase) RetryVideoPostProcess() {
 	movies, err := uc.MovieInteractor.GetWhereMultiple(&pagination.Pagination{
 		Limit:  -1,
 		Offset: -1,
-	}, map[string]interface{}{"status": "uploading"})
+	}, map[string]interface{}{"status": StatusUploading})
 	if err != nil {
 		return
 	}
@@ -180,13 +219,18 @@ func (uc *UseCase) RetryVideoPostProcess() {
 
 		movieCopy := movie
 
-		uc.Pool.Submit(func() {
-			uc.PostProcessVideo(movieCopy, tmpFile)
+		ctx, cancel := context.WithCancel(context.TODO())
+		group, groupCtx := uc.Pool.GroupContext(ctx)
+		uc.MoviePool[movie.Code] = PoolItem{groupCtx, cancel}
+		group.Submit(func() error {
+			err = uc.PostProcessVideo(groupCtx, movieCopy, tmpFile)
+			delete(uc.MoviePool, movie.Code)
+			return err
 		})
 	}
 }
 
-func (uc *UseCase) PostProcessVideo(movie Movie, tmpFile *os.File) error {
+func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *os.File) error {
 	resizedVideoPath := filepath.Join("upload/resize", movie.Code)
 	thumbsPath := filepath.Join("upload/thumbs/", movie.Code)
 
@@ -198,23 +242,21 @@ func (uc *UseCase) PostProcessVideo(movie Movie, tmpFile *os.File) error {
 		if err == nil {
 			for _, video := range movie.Videos {
 				if video.QualityID == 1 {
-					uc.VideoUseCase.Delete(&video)
+					err = uc.VideoUseCase.Delete(&video)
 					break
 				}
 			}
 		}
 	}()
 
-	if movie.WebVtt == nil {
-		// Thumbs
-		if err := uc.CreateThumbnails(movie, thumbsPath, tmpFile); err != nil {
-			uc.Delete(movie.Code)
-			return err
-		}
+	// Thumbs
+	if err := uc.CreateThumbnails(movie, thumbsPath, tmpFile); err != nil {
+		uc.Delete(movie.Code)
+		return err
 	}
 
 	// Resize
-	if err := uc.CreateResizedVideos(movie, resizedVideoPath, tmpFile); err != nil {
+	if err := uc.CreateResizedVideos(ctx, movie, resizedVideoPath, tmpFile); err != nil {
 		uc.Delete(movie.Code)
 		return err
 	}
@@ -223,6 +265,10 @@ func (uc *UseCase) PostProcessVideo(movie Movie, tmpFile *os.File) error {
 }
 
 func (uc *UseCase) CreateThumbnails(movie Movie, thumbsPath string, tmpFile *os.File) error {
+	if movie.WebVtt != nil {
+		return nil
+	}
+
 	frameDuration := 10
 	err := ffmpegthumbs.SplitVideoToThumbnails(tmpFile.Name(), thumbsPath, frameDuration)
 	if err != nil {
@@ -300,7 +346,7 @@ func (uc *UseCase) CreateThumbnails(movie Movie, thumbsPath string, tmpFile *os.
 	return nil
 }
 
-func (uc *UseCase) CreateResizedVideos(movie Movie, resizedVideoPath string, tmpFile *os.File) error {
+func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resizedVideoPath string, tmpFile *os.File) error {
 	var resizedWebmPath string
 	var savedVideo *video.Video
 	var qualitiesIds []uint
@@ -315,13 +361,12 @@ func (uc *UseCase) CreateResizedVideos(movie Movie, resizedVideoPath string, tmp
 		if slices.Contains(qualitiesIds, quality.ID) || videoHeight < quality.Settings.MinHeight {
 			continue
 		}
-
-		err := quality.Process(tmpFile.Name(), resizedVideoPath)
+		err := quality.Process(ctx, tmpFile.Name(), resizedVideoPath)
 		if err != nil {
 			return err
 		}
 
-		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Title+".webm")
+		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Code+".webm")
 		savedVideo, err = uc.VideoUseCase.Save(resizedWebmPath, videosSavePath, quality.ID)
 		if err != nil {
 			return err
@@ -334,7 +379,7 @@ func (uc *UseCase) CreateResizedVideos(movie Movie, resizedVideoPath string, tmp
 	}
 
 	movieUpdateRequest := &VideoUpdateRequest{
-		Status: "ready",
+		Status: StatusReady,
 		Code:   movie.Code,
 	}
 	rowsAffected, err := uc.UpdateVideo(movieUpdateRequest)
@@ -378,7 +423,9 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		if err != nil {
 			return err
 		}
-		isCorrectType, _ := uc.FileUseCase.VerifyFileType(buff, []string{"image/jpeg", "image/png", "image/webp"})
+		isCorrectType, previewFileType := uc.FileUseCase.VerifyFileType(buff, []string{
+			"image/jpeg", "image/png", "image/webp", "image/gif",
+		})
 		if !isCorrectType {
 			return errors.New("invalid file type")
 		}
@@ -407,26 +454,30 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 			return err
 		}
 
-		err = ffmpegthumbs.ToWebp(
-			previewFile.Name(),
-			previewsPath,
-			preview.OriginalName,
-		)
-		if err != nil {
-			return err
+		if previewFileType == "image/gif" {
+			movieRequest.PreviewWebpId = &preview.ID
+		} else {
+			err = ffmpegthumbs.ToWebp(
+				previewFile.Name(),
+				previewsPath,
+				preview.OriginalName,
+			)
+			if err != nil {
+				return err
+			}
+			webpFile, err := os.Open(filepath.Join(previewsPath, preview.OriginalName+".webp"))
+			if err != nil {
+				return err
+			}
+			webpFileInfo, _ := webpFile.Stat()
+			previewWebp, _ := uc.FileUseCase.Create(
+				webpFile, webpFileInfo.Name(), "movie/"+movie.Code, webpFileInfo.Size(), "public",
+			)
+			webpFile.Close()
+			movieRequest.PreviewWebpId = &previewWebp.ID
 		}
-		webpFile, err := os.Open(filepath.Join(previewsPath, preview.OriginalName+".webp"))
-		if err != nil {
-			return err
-		}
-		webpFileInfo, _ := webpFile.Stat()
-		previewWebp, _ := uc.FileUseCase.Create(
-			webpFile, webpFileInfo.Name(), "movie/"+movie.Code, webpFileInfo.Size(), "public",
-		)
-		webpFile.Close()
 
 		movieRequest.PreviewId = &preview.ID
-		movieRequest.PreviewWebpId = &previewWebp.ID
 		selectQuery = append(selectQuery, "PreviewId", "PreviewWebpId")
 		uc.RemovePreview(movie.Code)
 	} else if movie.RemovePreview {
@@ -550,7 +601,7 @@ func (uc *UseCase) CheckByUser(userId uint, code string) bool {
 		map[string]interface{}{
 			"user_id": userId,
 			"code":    code,
-			"status":  "uploading",
+			"status":  StatusUploading,
 		},
 	)
 	if err != nil {
@@ -560,12 +611,19 @@ func (uc *UseCase) CheckByUser(userId uint, code string) bool {
 	return true
 }
 
-func (uc *UseCase) GetMultipleByUserId(userId uint, pagination *pagination.Pagination) ([]*GetForUserResponse, error) {
+func (uc *UseCase) GetMultipleByUserId(userId uint, pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetForUserResponse, error) {
 	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
 	}
 
-	movies, err := uc.MovieInteractor.GetMultipleByUserId(userId, pagination)
+	order := ""
+	if slices.Contains([]string{"created_at"}, sorting.SortBy) {
+		order = fmt.Sprintf("%s %s", sorting.SortBy, sorting.SortVal)
+	} else {
+		order = "created_at desc"
+	}
+
+	movies, err := uc.MovieInteractor.GetMultipleByUserId(userId, pagination, order)
 	if err != nil {
 		return nil, err
 	}

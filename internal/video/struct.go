@@ -1,6 +1,7 @@
 package video
 
 import (
+	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"nine-dubz/internal/file"
 	"nine-dubz/pkg/ffmpegthumbs"
@@ -18,18 +19,18 @@ type Video struct {
 }
 
 type GetResponse struct {
-	Title  *string    `json:"title"`
-	Width  int        `json:"width"`
-	Height int        `json:"height"`
-	File   *file.File `json:"file"`
+	Quality *Quality   `json:"quality"`
+	Width   int        `json:"width"`
+	Height  int        `json:"height"`
+	File    *file.File `json:"file"`
 }
 
 func NewGetResponse(video Video) *GetResponse {
 	return &GetResponse{
-		Title:  GetQualityTitle(video.QualityID),
-		Width:  video.Width,
-		Height: video.Height,
-		File:   video.File,
+		Quality: GetQuality(video.QualityID),
+		Width:   video.Width,
+		Height:  video.Height,
+		File:    video.File,
 	}
 }
 
@@ -43,10 +44,11 @@ func NewGetResponseMultiple(videos []Video) []*GetResponse {
 }
 
 type Quality struct {
-	ID       uint
-	Title    string
-	Type     QualityType
-	Settings QualitySettings
+	ID       uint            `json:"-"`
+	Code     string          `json:"code"`
+	Title    string          `json:"title"`
+	Type     QualityType     `json:"-"`
+	Settings QualitySettings `json:"-"`
 }
 
 type QualityType struct {
@@ -57,7 +59,7 @@ var QualityTypeResize = QualityType{"Resize"}
 var QualityTypeConvert = QualityType{"Convert"}
 var QualityTypeSkip = QualityType{"Skip"}
 
-func (q *Quality) Process(pathFrom, pathTo string) error {
+func (q *Quality) Process(ctx context.Context, pathFrom, pathTo string) error {
 	switch q.Type {
 	case QualityTypeResize:
 		audioBitrate := q.Settings.AudioBitrate
@@ -67,6 +69,7 @@ func (q *Quality) Process(pathFrom, pathTo string) error {
 		}
 
 		return ffmpegthumbs.Resize(
+			ctx,
 			q.Settings.Height,
 			q.Settings.CRF,
 			q.Settings.Speed,
@@ -74,7 +77,7 @@ func (q *Quality) Process(pathFrom, pathTo string) error {
 			audioBitrate,
 			pathFrom,
 			pathTo,
-			q.Title,
+			q.Code,
 		)
 	case QualityTypeConvert:
 		origVideoBitrate, err := ffmpegthumbs.GetVideoBitrate(pathFrom)
@@ -83,12 +86,13 @@ func (q *Quality) Process(pathFrom, pathTo string) error {
 		}
 
 		return ffmpegthumbs.ToWebm(
+			ctx,
 			pathFrom,
 			q.Settings.CRF,
 			q.Settings.Speed,
 			origVideoBitrate,
 			pathTo,
-			q.Title,
+			q.Code,
 		)
 	}
 
@@ -104,10 +108,10 @@ type QualitySettings struct {
 	AudioBitrate string
 }
 
-func GetQualityTitle(id uint) *string {
+func GetQuality(id uint) *Quality {
 	for _, quality := range SupportedQualities {
 		if quality.ID == id {
-			return &quality.Title
+			return &quality
 		}
 	}
 
@@ -118,12 +122,14 @@ var SupportedQualities = []Quality{
 	{
 		ID:    1,
 		Type:  QualityTypeSkip,
-		Title: "tmp",
+		Code:  "tmp",
+		Title: "VIDEO_QUALITY_SOURCE",
 	},
 	{
 		ID:    2,
 		Type:  QualityTypeResize,
-		Title: "shakal",
+		Code:  "shakal",
+		Title: "VIDEO_QUALITY_SHAKAL",
 		Settings: QualitySettings{
 			MinHeight: 0, Height: 240, CRF: "50", Speed: "5", VideoBitrate: "5", AudioBitrate: "2000",
 		},
@@ -131,7 +137,8 @@ var SupportedQualities = []Quality{
 	{
 		ID:    3,
 		Type:  QualityTypeResize,
-		Title: "360",
+		Code:  "360",
+		Title: "VIDEO_QUALITY_360",
 		Settings: QualitySettings{
 			MinHeight: 360, Height: 360, CRF: "33", Speed: "3", VideoBitrate: "900k",
 		},
@@ -139,7 +146,8 @@ var SupportedQualities = []Quality{
 	{
 		ID:    4,
 		Type:  QualityTypeResize,
-		Title: "480",
+		Code:  "480",
+		Title: "VIDEO_QUALITY_480",
 		Settings: QualitySettings{
 			MinHeight: 480, Height: 480, CRF: "33", Speed: "3", VideoBitrate: "1000k",
 		},
@@ -147,7 +155,8 @@ var SupportedQualities = []Quality{
 	{
 		ID:    5,
 		Type:  QualityTypeResize,
-		Title: "720",
+		Code:  "720",
+		Title: "VIDEO_QUALITY_720",
 		Settings: QualitySettings{
 			MinHeight: 720, Height: 720, CRF: "32", Speed: "2", VideoBitrate: "1800k",
 		},
@@ -155,7 +164,8 @@ var SupportedQualities = []Quality{
 	{
 		ID:    6,
 		Type:  QualityTypeConvert,
-		Title: "origWebm",
+		Code:  "origWebm",
+		Title: "VIDEO_QUALITY_SOURCE",
 		Settings: QualitySettings{
 			MinHeight: 0, CRF: "31", Speed: "1",
 		},

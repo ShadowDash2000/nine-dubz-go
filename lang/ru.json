@@ -72,6 +72,26 @@
     {
       "code": "FILE_TOO_LARGE",
       "text": "Файл слишком большой"
+    },
+    {
+      "code": "VIDEO_QUALITY_SHAKAL",
+      "text": "ШАКАЛ 🐺"
+    },
+    {
+      "code": "VIDEO_QUALITY_SOURCE",
+      "text": "Источник"
+    },
+    {
+      "code": "VIDEO_QUALITY_360",
+      "text": "360p"
+    },
+    {
+      "code": "VIDEO_QUALITY_480",
+      "text": "480p"
+    },
+    {
+      "code": "VIDEO_QUALITY_720",
+      "text": "720p"
     }
   ]
 }

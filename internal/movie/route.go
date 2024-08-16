@@ -21,6 +21,7 @@ func (h *Handler) Routes(r chi.Router) {
 				r.Route("/", func(r chi.Router) {
 					r.
 						With(pagination.SetPaginationContextMiddleware).
+						With(sorting.SetSortContextMiddleware).
 						Get("/", h.GetMultipleForUserHandler)
 					r.Post("/", h.AddHandler)
 				})

@@ -97,7 +97,7 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	if comments != nil {
 		render.JSON(w, r, comments)
 	} else {
-		render.Status(r, http.StatusNotFound)
+		render.Status(r, http.StatusOK)
 		render.JSON(w, r, make([]struct{}, 0))
 	}
 }
