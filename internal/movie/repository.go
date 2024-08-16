@@ -51,6 +51,7 @@ func (mr *Repository) Get(code string) (*Movie, error) {
 	movie := &Movie{}
 	result := mr.DB.
 		Preload("Videos").
+		Preload("Videos").
 		Preload("Videos.File").
 		Preload("Preview").
 		Preload("PreviewWebp").
@@ -103,7 +104,14 @@ func (mr *Repository) GetSelectWhere(selectQuery, where interface{}) (*Movie, er
 	return movie, result.Error
 }
 
-func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pagination) (*[]Movie, error) {
+func (mr *Repository) GetWhereCount(where interface{}) (int64, error) {
+	var count int64
+	result := mr.DB.Model(&Movie{}).Where(where).Count(&count)
+
+	return count, result.Error
+}
+
+func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pagination, order string) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
 		Preload("Videos").
@@ -116,6 +124,7 @@ func (mr *Repository) GetMultipleByUserId(userId uint, pagination *pagination.Pa
 		Where("user_id = ?", userId).
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
+		Order(order).
 		Find(&movies)
 
 	return movies, result.Error

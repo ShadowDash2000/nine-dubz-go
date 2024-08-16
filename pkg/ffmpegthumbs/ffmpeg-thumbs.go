@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	ffmpeg "github.com/u2takey/ffmpeg-go"
+	"golang.org/x/net/context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -146,13 +147,13 @@ func GetBitrate(filePath, codecType string) (string, error) {
 	return bitrate, nil
 }
 
-func Resize(height int, crf, speed, videoBitrate, audioBitrate, filePath, outputPath, fileName string) error {
+func Resize(ctx context.Context, height int, crf, speed, videoBitrate, audioBitrate, filePath, outputPath, fileName string) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	err = ffmpeg.
+	stream := ffmpeg.
 		Input(filePath).
 		Filter("scale", ffmpeg.Args{fmt.Sprintf("-1:%d", height)}).
 		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
@@ -165,23 +166,24 @@ func Resize(height int, crf, speed, videoBitrate, audioBitrate, filePath, output
 			"b:a":   audioBitrate,
 		}).
 		Silent(true).
-		OverWriteOutput().
-		Run()
+		OverWriteOutput()
+
+	stream.Context, _ = context.WithCancel(ctx)
+	err = stream.Run()
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 
 	return nil
 }
 
-func ToWebm(filePath, crf, speed, bitrate, outputPath, fileName string) error {
+func ToWebm(ctx context.Context, filePath, crf, speed, bitrate, outputPath, fileName string) error {
 	err := os.MkdirAll(outputPath, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	err = ffmpeg.
+	stream := ffmpeg.
 		Input(filePath).
 		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
 			"c:v":   "libvpx-vp9",
@@ -191,8 +193,10 @@ func ToWebm(filePath, crf, speed, bitrate, outputPath, fileName string) error {
 			"c:a":   "libopus",
 		}).
 		Silent(true).
-		OverWriteOutput().
-		Run()
+		OverWriteOutput()
+
+	stream.Context, _ = context.WithCancel(ctx)
+	err = stream.Run()
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	"nine-dubz/internal/sorting"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
+	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"nine-dubz/pkg/userip"
 	"strconv"
@@ -199,6 +200,14 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	languageCode := language.GetLanguageCode(r)
+	for key, video := range movie.Videos {
+		message, err := language.GetMessage(video.Quality.Title, languageCode)
+		if err == nil {
+			movie.Videos[key].Quality.Title = message
+		}
+	}
+
 	render.JSON(w, r, movie)
 }
 
@@ -218,8 +227,9 @@ func (h *Handler) GetForUserHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetMultipleForUserHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId").(uint)
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
+	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
-	moviesResponse, err := h.MovieUseCase.GetMultipleByUserId(userId, pagination)
+	moviesResponse, err := h.MovieUseCase.GetMultipleByUserId(userId, pagination, sorting)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
@@ -248,7 +258,7 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	if len(moviesResponse) > 0 {
 		render.JSON(w, r, moviesResponse)
 	} else {
-		render.Status(r, http.StatusNotFound)
+		render.Status(r, http.StatusOK)
 		render.JSON(w, r, make([]struct{}, 0))
 	}
 }
@@ -317,7 +327,7 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 
 	var file *file.File
 	for _, video := range movie.Videos {
-		if video.Title != nil && *video.Title == quality {
+		if video.Quality != nil && video.Quality.Code == quality {
 			file = video.File
 			break
 		}

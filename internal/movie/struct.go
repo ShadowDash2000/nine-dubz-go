@@ -1,6 +1,7 @@
 package movie
 
 import (
+	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"mime/multipart"
 	"nine-dubz/internal/file"
@@ -33,6 +34,16 @@ type Movie struct {
 	WebVttId             *uint         `json:"-"`
 	WebVtt               *file.File    `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 	Views                []view.View
+}
+
+const (
+	StatusUploading = "uploading"
+	StatusReady     = "ready"
+)
+
+type PoolItem struct {
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 type VideoUploadHeader struct {
