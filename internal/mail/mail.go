@@ -44,5 +44,5 @@ func New() *UseCase {
 }
 
 func (uc *UseCase) SendMail(to, subject, content string) error {
-	return uc.MailInteractor.SendMail(uc.DefaultEmailFrom, to, subject, content)
+	return uc.MailInteractor.SendMail("Nine Dubz", uc.DefaultEmailFrom, to, subject, content)
 }
