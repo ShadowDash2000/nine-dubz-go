@@ -152,7 +152,7 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket(
 		filepath.Join("upload/resize", movie.Code),
 		quality.Code+".mp4",
-		[]string{"video/mp4"},
+		[]string{"video/mp4", "video/avi", "video/webm"},
 		header.Size,
 		conn,
 	)
