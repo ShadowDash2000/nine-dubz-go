@@ -112,7 +112,11 @@ func (uc *UseCase) ConfirmRegistration(email, hash string) (uint, bool) {
 	return user.ID, true
 }
 
-func (uc *UseCase) GetMultiple(where, distinct interface{}) ([]User, error) {
+func (uc *UseCase) GetMultiple(where interface{}) ([]User, error) {
+	return uc.UserInteractor.GetWhereMultiple(where)
+}
+
+func (uc *UseCase) GetDistinctMultiple(where, distinct interface{}) ([]User, error) {
 	return uc.UserInteractor.GetMultiple(where, distinct)
 }
 

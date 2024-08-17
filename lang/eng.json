@@ -92,6 +92,26 @@
     {
       "code": "VIDEO_QUALITY_720",
       "text": "720p"
+    },
+    {
+      "code": "SUBSCRIPTION_ALREADY_EXISTS",
+      "text": "You have already subscribed to this channel"
+    },
+    {
+      "code": "SUBSCRIPTION_FAILED_TO_SUBSCRIBE",
+      "text": "Failed to subscribe"
+    },
+    {
+      "code": "SUBSCRIPTION_FAILED_TO_UNSUBSCRIBE",
+      "text": "Failed to unsubscribe"
+    },
+    {
+      "code": "SUBSCRIPTION_NOT_SUBSCRIBED",
+      "text": "You're not subscribed to this channel"
+    },
+    {
+      "code": "SUBSCRIPTION_NO_SUBSCRIPTIONS",
+      "text": "You don't have subscriptions"
     }
   ]
 }

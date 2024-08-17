@@ -11,6 +11,7 @@ import (
 	"nine-dubz/internal/googleoauth"
 	"nine-dubz/internal/movie"
 	"nine-dubz/internal/role"
+	"nine-dubz/internal/subscription"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/internal/video"
@@ -58,6 +59,7 @@ func NewGormDb() *gorm.DB {
 		&comment.Comment{},
 		&view.View{},
 		&movie.Movie{},
+		&subscription.Subscription{},
 	)
 
 	var count int64

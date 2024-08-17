@@ -49,6 +49,15 @@ func NewGetPublicResponse(user *User) *GetPublicResponse {
 	}
 }
 
+func NewGetPublicResponseMultiple(users []User) []*GetPublicResponse {
+	var result []*GetPublicResponse
+	for _, user := range users {
+		result = append(result, NewGetPublicResponse(&user))
+	}
+
+	return result
+}
+
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`

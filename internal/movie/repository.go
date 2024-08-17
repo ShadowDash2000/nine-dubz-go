@@ -151,7 +151,7 @@ func (mr *Repository) GetMultiple(pagination *pagination.Pagination, order strin
 	return movies, result.Error
 }
 
-func (mr *Repository) GetWhereMultiple(pagination *pagination.Pagination, where map[string]interface{}) (*[]Movie, error) {
+func (mr *Repository) GetWhereMultiple(where map[string]interface{}, pagination *pagination.Pagination, order string) (*[]Movie, error) {
 	movies := &[]Movie{}
 	result := mr.DB.
 		Preload("Videos").
@@ -166,6 +166,7 @@ func (mr *Repository) GetWhereMultiple(pagination *pagination.Pagination, where 
 		Limit(pagination.Limit).
 		Offset(pagination.Offset).
 		Where(where).
+		Order(order).
 		Find(&movies)
 
 	return movies, result.Error
@@ -181,4 +182,21 @@ func (mr *Repository) GetPreloadWhere(preloads []string, whereQuery interface{})
 	result = result.Where(whereQuery).First(&movie)
 
 	return movie, result.Error
+}
+
+func (mr *Repository) GetPreloadWhereMultiple(preloads []string, whereQuery interface{}, pagination *pagination.Pagination, order string) (*[]Movie, error) {
+	movies := &[]Movie{}
+	result := mr.DB
+	for _, preload := range preloads {
+		result = result.Preload(preload)
+	}
+
+	result = result.
+		Limit(pagination.Limit).
+		Offset(pagination.Offset).
+		Where(whereQuery).
+		Order(order).
+		First(&movies)
+
+	return movies, result.Error
 }

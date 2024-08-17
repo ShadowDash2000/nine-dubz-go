@@ -86,6 +86,7 @@ type GetResponse struct {
 	Videos             []*video.GetResponse    `json:"videos"`
 	WebVtt             *file.File              `json:"webVtt"`
 	User               *user.GetPublicResponse `json:"user"`
+	Subscribed         bool                    `json:"subscribed"`
 	Views              int64                   `json:"views"`
 }
 

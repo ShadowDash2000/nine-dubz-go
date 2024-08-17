@@ -19,6 +19,7 @@ import (
 	"nine-dubz/internal/response"
 	"nine-dubz/internal/role"
 	"nine-dubz/internal/seo"
+	"nine-dubz/internal/subscription"
 	"nine-dubz/internal/token"
 	"nine-dubz/internal/user"
 	"nine-dubz/internal/video"
@@ -52,8 +53,9 @@ func (app *App) Start() {
 	ruc := role.New(app.DB)
 	vuc := view.New(app.DB)
 	viduc := video.New(app.DB, fuc)
-	movuc := movie.New(app.DB, pool, viduc, fuc, vuc)
 	uuc := user.New(app.DB, tuc, ruc, fuc, muc)
+	subuc := subscription.New(app.DB)
+	movuc := movie.New(app.DB, pool, viduc, fuc, vuc, subuc)
 	goauc := googleoauth.New(app.DB, uuc, fuc)
 	cuc := comment.New(app.DB, movuc, uuc)
 	seouc := seo.New(movuc)
@@ -73,17 +75,11 @@ func (app *App) Start() {
 	goah := googleoauth.NewHandler(goauc, uh, tuc, ta)
 	ch := comment.NewHandler(cuc, uh)
 	seoh := seo.NewHandler(seouc)
+	subh := subscription.NewHandler(subuc, uh)
 
 	//app.Router.Use(middleware.Logger)
 	app.Router.Use(middleware.Recoverer)
 	app.Router.Use(middleware.URLFormat)
-	app.Router.Use(httprate.Limit(
-		30,
-		2*time.Second,
-		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "Too many requests", http.StatusTooManyRequests)
-		}),
-	))
 	app.Router.Use(render.SetContentType(render.ContentTypeJSON))
 	app.Router.Use(language.SetLanguageContext)
 
@@ -112,12 +108,23 @@ func (app *App) Start() {
 			response.RenderError(w, r, http.StatusNotFound, "not found")
 		})
 
-		uh.Routes(r)
 		fh.Routes(r)
-		mh.Routes(r)
-		goah.Routes(r)
-		ch.Routes(r)
-		seoh.Routes(r)
+
+		r.
+			With(httprate.Limit(
+				30,
+				2*time.Second,
+				httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
+					http.Error(w, "Too many requests", http.StatusTooManyRequests)
+				}),
+			)).Route("/", func(r chi.Router) {
+			uh.Routes(r)
+			mh.Routes(r)
+			goah.Routes(r)
+			ch.Routes(r)
+			seoh.Routes(r)
+			subh.Routes(r)
+		})
 	})
 
 	appIp, ok := os.LookupEnv("APP_IP")

@@ -16,6 +16,7 @@ import (
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/pagination"
 	"nine-dubz/internal/sorting"
+	"nine-dubz/internal/subscription"
 	"nine-dubz/internal/video"
 	"nine-dubz/internal/view"
 	"nine-dubz/pkg/ffmpegthumbs"
@@ -31,16 +32,17 @@ import (
 )
 
 type UseCase struct {
-	MovieInteractor Interactor
-	SiteUrl         string
-	Pool            *pond.WorkerPool
-	VideoUseCase    *video.UseCase
-	FileUseCase     *file.UseCase
-	ViewUseCase     *view.UseCase
-	MoviePool       map[string]PoolItem
+	MovieInteractor     Interactor
+	SiteUrl             string
+	Pool                *pond.WorkerPool
+	VideoUseCase        *video.UseCase
+	FileUseCase         *file.UseCase
+	ViewUseCase         *view.UseCase
+	SubscriptionUseCase *subscription.UseCase
+	MoviePool           map[string]PoolItem
 }
 
-func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.UseCase, vuc *view.UseCase) *UseCase {
+func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.UseCase, vuc *view.UseCase, subuc *subscription.UseCase) *UseCase {
 	siteUrl, ok := os.LookupEnv("SITE_URL")
 	if !ok {
 		log.Println("movie: SITE_URL not found in environment")
@@ -50,12 +52,13 @@ func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.Use
 		MovieInteractor: &Repository{
 			DB: db,
 		},
-		SiteUrl:      siteUrl,
-		Pool:         pool,
-		VideoUseCase: viduc,
-		FileUseCase:  fuc,
-		ViewUseCase:  vuc,
-		MoviePool:    make(map[string]PoolItem),
+		SiteUrl:             siteUrl,
+		Pool:                pool,
+		VideoUseCase:        viduc,
+		FileUseCase:         fuc,
+		ViewUseCase:         vuc,
+		SubscriptionUseCase: subuc,
+		MoviePool:           make(map[string]PoolItem),
 	}
 }
 
@@ -189,10 +192,14 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 }
 
 func (uc *UseCase) RetryVideoPostProcess() {
-	movies, err := uc.MovieInteractor.GetWhereMultiple(&pagination.Pagination{
-		Limit:  -1,
-		Offset: -1,
-	}, map[string]interface{}{"status": StatusUploading})
+	movies, err := uc.MovieInteractor.GetWhereMultiple(
+		map[string]interface{}{"status": StatusUploading},
+		&pagination.Pagination{
+			Limit:  -1,
+			Offset: -1,
+		},
+		"",
+	)
 	if err != nil {
 		return
 	}
@@ -535,12 +542,22 @@ func (uc *UseCase) UpdatePublishStatus(userId uint, movie *UpdatePublishStatusRe
 	)
 }
 
-func (uc *UseCase) Get(userId *uint, code string, userIp ...net.IP) (*GetResponse, error) {
-	var ip net.IP
-	if len(userIp) == 1 {
-		ip = userIp[0]
+func (uc *UseCase) Get(userId *uint, code string) (*GetResponse, error) {
+	movie, err := uc.MovieInteractor.Get(code)
+	if err != nil {
+		return nil, err
 	}
 
+	if movie.IsPublished || movie.UserId == *userId {
+		response := NewGetResponse(movie)
+
+		return response, nil
+	}
+
+	return nil, errors.New("not allowed")
+}
+
+func (uc *UseCase) GetPublic(userId *uint, code string, userIp net.IP) (*GetResponse, error) {
 	movie, err := uc.MovieInteractor.Get(code)
 	if err != nil {
 		return nil, err
@@ -554,11 +571,14 @@ func (uc *UseCase) Get(userId *uint, code string, userIp ...net.IP) (*GetRespons
 			response.Views = viewsCount
 		}
 
-		if ip != nil {
-			view, err := uc.ViewUseCase.Add(movie.ID, userId, ip)
-			if err == nil {
-				uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Views", view)
-			}
+		if userId != nil {
+			subscription, _ := uc.SubscriptionUseCase.Get(*userId, movie.UserId)
+			response.Subscribed = subscription.ID > 0
+		}
+
+		view, err := uc.ViewUseCase.Add(movie.ID, userId, userIp)
+		if err == nil {
+			uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Views", view)
 		}
 
 		return response, nil
@@ -710,6 +730,57 @@ func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sorting *sorti
 				return moviesPayload[i].Views < moviesPayload[j].Views
 			})
 			break
+		}
+	}
+
+	return moviesPayload, nil
+}
+
+func (uc *UseCase) GetMultipleSubscribed(userId uint, pagination *pagination.Pagination) ([]*GetResponse, error) {
+	if pagination.Limit > 20 || pagination.Limit == -1 {
+		pagination.Limit = 20
+	}
+
+	subscriptions, err := uc.SubscriptionUseCase.GetAll(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var usersIds []uint
+	for _, subscription := range subscriptions {
+		usersIds = append(usersIds, subscription.ChannelID)
+	}
+
+	movies, err := uc.MovieInteractor.GetPreloadWhereMultiple(
+		[]string{"Preview", "PreviewWebp", "DefaultPreview", "DefaultPreviewWebp", "WebVtt", "User", "User.Picture"},
+		map[string]interface{}{"user_id": usersIds},
+		pagination,
+		"created_at desc",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(*movies) == 0 {
+		return nil, err
+	}
+
+	var moviesPayload []*GetResponse
+	for _, movie := range *movies {
+		moviesPayload = append(moviesPayload, NewGetResponse(&movie))
+	}
+
+	var moviesIds []uint
+	for _, movie := range moviesPayload {
+		moviesIds = append(moviesIds, movie.ID)
+	}
+
+	viewsCounts, err := uc.ViewUseCase.GetMultipleCount(moviesIds)
+	if err == nil {
+		for key, movie := range moviesPayload {
+			if _, ok := viewsCounts[movie.ID]; ok {
+				moviesPayload[key].Views = viewsCounts[movie.ID]
+			}
 		}
 	}
 

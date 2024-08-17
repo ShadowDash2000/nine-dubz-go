@@ -55,6 +55,13 @@ func (r *Repository) GetWhere(user *User, where map[string]interface{}) error {
 	return result.Error
 }
 
+func (r *Repository) GetWhereMultiple(where interface{}) ([]User, error) {
+	var users []User
+	result := r.DB.Preload("Picture").Where(where).Find(&users)
+
+	return users, result.Error
+}
+
 func (r *Repository) GetMultiple(where, distinct interface{}) ([]User, error) {
 	var users []User
 	result := r.DB.
