@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"io"
 	"math/rand"
@@ -30,6 +31,35 @@ func (fr *Repository) Create(file io.ReadSeeker, name, path string, size int64, 
 	extension := filepath.Ext(name)
 
 	_, err := fr.S3Storage.PutObject(file, newFileName+extension, path)
+	if err != nil {
+		return nil, err
+	}
+
+	savedFile := &File{
+		Name:         newFileName,
+		Extension:    extension,
+		OriginalName: name,
+		Size:         size,
+		Path:         path,
+		Type:         fileType,
+	}
+	result := fr.DB.Create(&savedFile)
+	if result.Error != nil {
+		fr.S3Storage.DeleteObject(newFileName, path)
+		return nil, err
+	}
+
+	return savedFile, result.Error
+}
+
+func (fr *Repository) CreateMultipart(ctx context.Context, file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
+	timeNow := time.Now().UnixNano()
+	randomNumber := rand.Intn(1000)
+
+	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
+	extension := filepath.Ext(name)
+
+	_, err := fr.S3Storage.MultipartUpload(ctx, file, size, newFileName+extension, path)
 	if err != nil {
 		return nil, err
 	}

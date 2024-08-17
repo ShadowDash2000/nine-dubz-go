@@ -161,21 +161,24 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 		return err
 	}
 
-	savedVideo, err := uc.VideoUseCase.Save(tmpFile.Name(), "movie/"+movie.Code, quality.ID)
+	ctx, cancel := context.WithCancel(context.TODO())
+	group, groupCtx := uc.Pool.GroupContext(ctx)
+	uc.MoviePool[movie.Code] = PoolItem{groupCtx, cancel}
+
+	savedVideo, err := uc.VideoUseCase.Save(groupCtx, tmpFile.Name(), "movie/"+movie.Code, quality.ID)
 	if err != nil {
+		uc.Delete(movie.Code)
 		return err
 	}
 
 	err = uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Videos", savedVideo)
 	if err != nil {
+		uc.Delete(movie.Code)
 		return errors.New("failed to update video")
 	}
 
 	movie.Videos = append(movie.Videos, *savedVideo)
 
-	ctx, cancel := context.WithCancel(context.TODO())
-	group, groupCtx := uc.Pool.GroupContext(ctx)
-	uc.MoviePool[movie.Code] = PoolItem{groupCtx, cancel}
 	group.Submit(func() error {
 		err = uc.PostProcessVideo(groupCtx, *movie, tmpFile)
 		delete(uc.MoviePool, movie.Code)
@@ -367,7 +370,7 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 		}
 
 		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Code+".mp4")
-		savedVideo, err = uc.VideoUseCase.Save(resizedWebmPath, videosSavePath, quality.ID)
+		savedVideo, err = uc.VideoUseCase.Save(ctx, resizedWebmPath, videosSavePath, quality.ID)
 		if err != nil {
 			return err
 		}

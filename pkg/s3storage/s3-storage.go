@@ -1,6 +1,7 @@
 package s3storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -72,15 +73,86 @@ func (sr *S3Storage) GetS3Client() *s3.Client {
 	return client
 }
 
+func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, fileSize int64, key, prefix string) (*s3.CompleteMultipartUploadOutput, error) {
+	client := sr.GetS3Client()
+	key, err := url.JoinPath(prefix, key)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, _ = context.WithCancel(ctx)
+	createMultipartUploadOutput, err := client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket: aws.String(sr.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	abortMultipartUploadInput := &s3.AbortMultipartUploadInput{
+		Bucket:   aws.String(sr.Bucket),
+		Key:      aws.String(key),
+		UploadId: createMultipartUploadOutput.UploadId,
+	}
+
+	var completedParts []types.CompletedPart
+	partNumber := int32(1)
+	chunkSize := 1024 * 1024 * 50
+	bytesRead := int64(0)
+	buff := make([]byte, chunkSize)
+	for bytesRead < fileSize {
+		n, err := file.Read(buff)
+		if err != nil {
+			client.AbortMultipartUpload(ctx, abortMultipartUploadInput)
+			return nil, err
+		}
+		bytesRead += int64(n)
+
+		uploadPartOutput, err := client.UploadPart(ctx, &s3.UploadPartInput{
+			Bucket:        aws.String(sr.Bucket),
+			Key:           aws.String(key),
+			Body:          bytes.NewReader(buff[:n]),
+			PartNumber:    aws.Int32(partNumber),
+			UploadId:      createMultipartUploadOutput.UploadId,
+			ContentLength: aws.Int64(int64(n)),
+		})
+		if err != nil {
+			client.AbortMultipartUpload(ctx, abortMultipartUploadInput)
+			return nil, err
+		}
+
+		completedParts = append(completedParts, types.CompletedPart{
+			ETag:       uploadPartOutput.ETag,
+			PartNumber: aws.Int32(partNumber),
+		})
+
+		partNumber++
+	}
+
+	completeMultipartUploadOutput, err := client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(sr.Bucket),
+		Key:      aws.String(key),
+		UploadId: createMultipartUploadOutput.UploadId,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: completedParts,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return completeMultipartUploadOutput, nil
+}
+
 func (sr *S3Storage) PutObject(file io.ReadSeeker, key, prefix string) (*s3.PutObjectOutput, error) {
 	client := sr.GetS3Client()
-	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	key, err := url.JoinPath(prefix, key)
 	if err != nil {
 		return nil, err
 	}
 
 	output, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(path),
+		Bucket: aws.String(sr.Bucket),
 		Key:    aws.String(key),
 		Body:   file,
 	})
@@ -98,13 +170,13 @@ func (sr *S3Storage) PutObject(file io.ReadSeeker, key, prefix string) (*s3.PutO
 
 func (sr *S3Storage) GetRangeObject(key, prefix, fileRange string) (*s3.GetObjectOutput, error) {
 	client := sr.GetS3Client()
-	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	key, err := url.JoinPath(prefix, key)
 	if err != nil {
 		return nil, err
 	}
 
 	object, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(path),
+		Bucket: aws.String(sr.Bucket),
 		Key:    aws.String(key),
 		Range:  aws.String(fileRange),
 	})
@@ -117,13 +189,13 @@ func (sr *S3Storage) GetRangeObject(key, prefix, fileRange string) (*s3.GetObjec
 
 func (sr *S3Storage) GetObject(key, prefix string) (*s3.GetObjectOutput, error) {
 	client := sr.GetS3Client()
-	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	key, err := url.JoinPath(prefix, key)
 	if err != nil {
 		return nil, err
 	}
 
 	object, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(path),
+		Bucket: aws.String(sr.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -168,13 +240,13 @@ func (sr *S3Storage) DeleteAllInPrefix(prefix string) (*s3.DeleteObjectsOutput, 
 
 func (sr *S3Storage) DeleteObject(key, prefix string) (*s3.DeleteObjectOutput, error) {
 	client := sr.GetS3Client()
-	path, err := url.JoinPath(sr.Bucket, prefix, "/")
+	key, err := url.JoinPath(prefix, key)
 	if err != nil {
 		return nil, err
 	}
 
 	object, err := client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
-		Bucket: aws.String(path),
+		Bucket: aws.String(sr.Bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -186,18 +258,21 @@ func (sr *S3Storage) DeleteObject(key, prefix string) (*s3.DeleteObjectOutput, e
 
 func (sr *S3Storage) DeleteObjects(keys []string, prefix string) (*s3.DeleteObjectsOutput, error) {
 	client := sr.GetS3Client()
-	path, err := url.JoinPath(sr.Bucket, prefix, "/")
-	if err != nil {
-		return nil, err
-	}
 
 	var objects []types.ObjectIdentifier
 	for _, key := range keys {
-		objects = append(objects, types.ObjectIdentifier{Key: aws.String(key)})
+		key, err := url.JoinPath(prefix, key)
+		if err != nil {
+			return nil, err
+		}
+
+		objects = append(objects, types.ObjectIdentifier{
+			Key: aws.String(key),
+		})
 	}
 
 	object, err := client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{
-		Bucket: aws.String(path),
+		Bucket: aws.String(sr.Bucket),
 		Delete: &types.Delete{
 			Objects: objects,
 		},
