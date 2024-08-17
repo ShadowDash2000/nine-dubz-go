@@ -5,6 +5,7 @@ import (
 	"gorm.io/gorm"
 	"nine-dubz/internal/file"
 	"nine-dubz/pkg/ffmpegthumbs"
+	"sort"
 )
 
 type Video struct {
@@ -40,6 +41,10 @@ func NewGetResponseMultiple(videos []Video) []*GetResponse {
 		response = append(response, NewGetResponse(video))
 	}
 
+	sort.Slice(response, func(i, j int) bool {
+		return response[i].Quality.Order < response[j].Quality.Order
+	})
+
 	return response
 }
 
@@ -49,6 +54,7 @@ type Quality struct {
 	Title    string          `json:"title"`
 	Type     QualityType     `json:"-"`
 	Settings QualitySettings `json:"-"`
+	Order    int             `json:"-"`
 }
 
 type QualityType struct {
@@ -124,12 +130,14 @@ var SupportedQualities = []Quality{
 		Type:  QualityTypeSkip,
 		Code:  "tmp",
 		Title: "VIDEO_QUALITY_SOURCE",
+		Order: 1,
 	},
 	{
 		ID:    2,
 		Type:  QualityTypeResize,
 		Code:  "shakal",
 		Title: "VIDEO_QUALITY_SHAKAL",
+		Order: 6,
 		Settings: QualitySettings{
 			MinHeight: 0, Height: 240, CRF: "50", Speed: "5", VideoBitrate: "5", AudioBitrate: "2000",
 		},
@@ -139,6 +147,7 @@ var SupportedQualities = []Quality{
 		Type:  QualityTypeResize,
 		Code:  "360",
 		Title: "VIDEO_QUALITY_360",
+		Order: 5,
 		Settings: QualitySettings{
 			MinHeight: 360, Height: 360, CRF: "33", Speed: "3", VideoBitrate: "900k",
 		},
@@ -148,6 +157,7 @@ var SupportedQualities = []Quality{
 		Type:  QualityTypeResize,
 		Code:  "480",
 		Title: "VIDEO_QUALITY_480",
+		Order: 4,
 		Settings: QualitySettings{
 			MinHeight: 480, Height: 480, CRF: "33", Speed: "3", VideoBitrate: "1000k",
 		},
@@ -157,6 +167,7 @@ var SupportedQualities = []Quality{
 		Type:  QualityTypeResize,
 		Code:  "720",
 		Title: "VIDEO_QUALITY_720",
+		Order: 3,
 		Settings: QualitySettings{
 			MinHeight: 720, Height: 720, CRF: "32", Speed: "2", VideoBitrate: "1800k",
 		},
@@ -166,6 +177,7 @@ var SupportedQualities = []Quality{
 		Type:  QualityTypeConvert,
 		Code:  "origWebm",
 		Title: "VIDEO_QUALITY_SOURCE",
+		Order: 2,
 		Settings: QualitySettings{
 			MinHeight: 0, CRF: "31", Speed: "1",
 		},

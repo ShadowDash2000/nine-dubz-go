@@ -361,7 +361,7 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 	_, videoHeight, _ := ffmpegthumbs.GetVideoSize(tmpFile.Name())
 
 	for _, quality := range video.SupportedQualities {
-		if slices.Contains(qualitiesIds, quality.ID) || videoHeight < quality.Settings.MinHeight {
+		if slices.Contains(qualitiesIds, quality.ID) || videoHeight <= quality.Settings.MinHeight {
 			continue
 		}
 		err := quality.Process(ctx, tmpFile.Name(), resizedVideoPath)
