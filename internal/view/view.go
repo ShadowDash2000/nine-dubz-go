@@ -30,7 +30,7 @@ func (uc *UseCase) Add(movieId uint, userId *uint, ip net.IP) (*View, error) {
 		return nil, errors.New("view: too early to add a view")
 	}
 
-	view := &View{}
+	view := &View{MovieID: movieId}
 	view.UserID = userId
 	view.IP = ip.String()
 
