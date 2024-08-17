@@ -251,7 +251,7 @@ func (uc *UseCase) Format(comments *[]Comment) error {
 		return nil
 	}
 
-	users, err := uc.UserUseCase.GetMultiple(
+	users, err := uc.UserUseCase.GetDistinctMultiple(
 		map[string]interface{}{"id": userIds},
 		[]string{"id", "name"},
 	)

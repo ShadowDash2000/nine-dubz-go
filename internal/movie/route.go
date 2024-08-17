@@ -58,5 +58,11 @@ func (h *Handler) Routes(r chi.Router) {
 				With(h.UserHandler.TryToGetUserId).
 				Head("/", h.StreamFile)
 		})
+		r.Route("/subscription", func(r chi.Router) {
+			r.
+				With(pagination.SetPaginationContextMiddleware).
+				With(h.UserHandler.IsAuthorized).
+				Get("/", h.GetMultipleSubscribedHandler)
+		})
 	})
 }

@@ -92,6 +92,26 @@
     {
       "code": "VIDEO_QUALITY_720",
       "text": "720p"
+    },
+    {
+      "code": "SUBSCRIPTION_ALREADY_EXISTS",
+      "text": "Вы уже подписаны на этот канал"
+    },
+    {
+      "code": "SUBSCRIPTION_FAILED_TO_SUBSCRIBE",
+      "text": "Невозможно подписаться"
+    },
+    {
+      "code": "SUBSCRIPTION_FAILED_TO_UNSUBSCRIBE",
+      "text": "Невозможно отписаться"
+    },
+    {
+      "code": "SUBSCRIPTION_NOT_SUBSCRIBED",
+      "text": "Вы не подписаны на этот канал"
+    },
+    {
+      "code": "SUBSCRIPTION_NO_SUBSCRIPTIONS",
+      "text": "У вас нет подписок"
     }
   ]
 }

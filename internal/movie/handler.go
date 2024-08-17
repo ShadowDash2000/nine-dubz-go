@@ -194,7 +194,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	userId := r.Context().Value("userId").(*uint)
 
 	userIp, _ := userip.GetIP(r)
-	movie, err := h.MovieUseCase.Get(userId, movieCode, userIp)
+	movie, err := h.MovieUseCase.GetPublic(userId, movieCode, userIp)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
@@ -249,6 +249,25 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
 	moviesResponse, err := h.MovieUseCase.GetMultiple(pagination, sorting)
+	if err != nil {
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
+		return
+	}
+
+	if len(moviesResponse) > 0 {
+		render.JSON(w, r, moviesResponse)
+	} else {
+		render.Status(r, http.StatusOK)
+		render.JSON(w, r, make([]struct{}, 0))
+	}
+}
+
+func (h *Handler) GetMultipleSubscribedHandler(w http.ResponseWriter, r *http.Request) {
+	userId := r.Context().Value("userId").(uint)
+	pagination := r.Context().Value("pagination").(*pagination.Pagination)
+
+	moviesResponse, err := h.MovieUseCase.GetMultipleSubscribed(userId, pagination)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
