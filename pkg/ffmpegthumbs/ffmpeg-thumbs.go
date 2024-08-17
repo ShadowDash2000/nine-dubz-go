@@ -155,7 +155,7 @@ func Resize(ctx context.Context, height int, crf, speed, videoBitrate, audioBitr
 
 	stream := ffmpeg.
 		Input(filePath).
-		Filter("scale", ffmpeg.Args{fmt.Sprintf("-1:%d", height)}).
+		Filter("scale", ffmpeg.Args{fmt.Sprintf("-2:%d", height)}).
 		Output(filepath.Join(outputPath, fileName+".mp4"), ffmpeg.KwArgs{
 			"map":   "0:a:0",
 			"c:v":   "libx264",
