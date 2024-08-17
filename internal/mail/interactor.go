@@ -1,5 +1,5 @@
 package mail
 
 type Interactor interface {
-	SendMail(from, to, subject, content string) error
+	SendMail(name, from, to, subject, content string) error
 }
