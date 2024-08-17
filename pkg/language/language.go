@@ -114,7 +114,7 @@ func SetLanguageContext(next http.Handler) http.Handler {
 		languageCode := ""
 		languageCookie, err := r.Cookie("lang")
 		if err != nil {
-			languageCode = "eng"
+			languageCode = "ru"
 		} else {
 			languageCode = languageCookie.Value
 		}
