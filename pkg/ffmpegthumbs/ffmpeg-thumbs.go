@@ -156,9 +156,9 @@ func Resize(ctx context.Context, height int, crf, speed, videoBitrate, audioBitr
 	stream := ffmpeg.
 		Input(filePath).
 		Filter("scale", ffmpeg.Args{fmt.Sprintf("-1:%d", height)}).
-		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
+		Output(filepath.Join(outputPath, fileName+".mp4"), ffmpeg.KwArgs{
 			"map":   "0:a:0",
-			"c:v":   "libvpx-vp9",
+			"c:v":   "libx264",
 			"crf":   crf,
 			"speed": speed,
 			"b:v":   videoBitrate,
@@ -185,8 +185,8 @@ func ToWebm(ctx context.Context, filePath, crf, speed, bitrate, outputPath, file
 
 	stream := ffmpeg.
 		Input(filePath).
-		Output(filepath.Join(outputPath, fileName+".webm"), ffmpeg.KwArgs{
-			"c:v":   "libvpx-vp9",
+		Output(filepath.Join(outputPath, fileName+".mp4"), ffmpeg.KwArgs{
+			"c:v":   "libx264",
 			"crf":   crf,
 			"speed": speed,
 			"b:v":   bitrate,

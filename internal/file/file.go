@@ -100,7 +100,7 @@ func (uc *UseCase) DownloadFile(pathTo, name, pathFrom string, file *File) (*os.
 		}
 
 		requestRange := fmt.Sprintf("bytes=%d-", currentByte)
-		buff, _, contentLength, err := uc.Stream(file.Name+file.Extension, pathFrom, requestRange)
+		buff, _, contentLength, err := uc.FileInteractor.Stream(file.Name+file.Extension, pathFrom, requestRange)
 		if err != nil {
 			tmpFile.Close()
 			os.Remove(tmpFile.Name())

@@ -44,7 +44,6 @@ func (h *Handler) Routes(r chi.Router) {
 					r.Post("/", h.RegisterHandler)
 				})
 			r.
-				With(h.IsNotAuthorized).
 				Route("/login", func(r chi.Router) {
 					r.Post("/", h.LoginHandler)
 				})

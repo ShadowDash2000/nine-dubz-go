@@ -151,7 +151,7 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket(
 		filepath.Join("upload/resize", movie.Code),
-		quality.Code+".webm",
+		quality.Code+".mp4",
 		[]string{"video/mp4"},
 		header.Size,
 		conn,
@@ -366,7 +366,7 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 			return err
 		}
 
-		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Code+".webm")
+		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Code+".mp4")
 		savedVideo, err = uc.VideoUseCase.Save(resizedWebmPath, videosSavePath, quality.ID)
 		if err != nil {
 			return err
