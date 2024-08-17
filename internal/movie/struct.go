@@ -33,7 +33,7 @@ type Movie struct {
 	User                 user.User     `json:"-" gorm:"foreignKey:UserId;references:ID"`
 	WebVttId             *uint         `json:"-"`
 	WebVtt               *file.File    `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
-	Views                []view.View
+	Views                []view.View   `gorm:"-"`
 }
 
 const (
