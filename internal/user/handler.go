@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"log"
 	"net/http"
 	"nine-dubz/internal/helper"
 	"nine-dubz/internal/response"
 	"nine-dubz/internal/token"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
+	"os"
 	"strconv"
 )
 
@@ -19,13 +21,20 @@ type Handler struct {
 	UserUseCase    *UseCase
 	TokenUseCase   *token.UseCase
 	TokenAuthorize *tokenauthorize.TokenAuthorize
+	SiteUrl        string
 }
 
 func NewHandler(uc *UseCase, tuc *token.UseCase, ta *tokenauthorize.TokenAuthorize) *Handler {
+	siteUrl, ok := os.LookupEnv("SITE_URL")
+	if !ok {
+		log.Println("user: SITE_URL not found in environment")
+	}
+
 	return &Handler{
 		UserUseCase:    uc,
 		TokenUseCase:   tuc,
 		TokenAuthorize: ta,
+		SiteUrl:        siteUrl,
 	}
 }
 
@@ -99,7 +108,7 @@ func (h *Handler) SendRegistrationEmail(r *http.Request, user *User) {
 	languageCode := language.GetLanguageCode(r)
 
 	subject, _ := language.GetMessage("EMAIL_REGISTRATION_CONFIRMATION", languageCode)
-	link := fmt.Sprintf("%s/api/authorize/inner/confirm/?email=%s&hash=%s", "https://"+r.Host, user.Email, user.Hash)
+	link := fmt.Sprintf("%s/api/authorize/inner/confirm/?email=%s&hash=%s", h.SiteUrl, user.Email, user.Hash)
 	contentValues := map[string]string{"userName": user.Name, "link": link}
 	content, _ := language.GetFormattedMessage("EMAIL_REGISTRATION_CONFIRMATION_CONTENT", contentValues, languageCode)
 
