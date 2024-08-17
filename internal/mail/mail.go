@@ -15,6 +15,10 @@ func New() *UseCase {
 	if !ok {
 		log.Println("No MAIL_HOST environment variable")
 	}
+	port, ok := os.LookupEnv("MAIL_PORT")
+	if !ok {
+		log.Println("No MAIL_PORT environment variable")
+	}
 	emailFrom, ok := os.LookupEnv("MAIL_EMAIL")
 	if !ok {
 		log.Println("No MAIL_EMAIL environment variable")
@@ -31,6 +35,7 @@ func New() *UseCase {
 	return &UseCase{
 		MailInteractor: &Repository{
 			Host:     host,
+			Port:     port,
 			Username: login,
 			Password: password,
 		},
