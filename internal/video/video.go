@@ -1,6 +1,7 @@
 package video
 
 import (
+	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"nine-dubz/internal/file"
 	"nine-dubz/pkg/ffmpegthumbs"
@@ -21,13 +22,13 @@ func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
 	}
 }
 
-func (uc *UseCase) Save(filePath, pathTo string, qualityId uint) (*Video, error) {
+func (uc *UseCase) Save(ctx context.Context, filePath, pathTo string, qualityId uint) (*Video, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	fileInfo, _ := os.Stat(file.Name())
-	savedFile, err := uc.FileUseCase.Create(file, fileInfo.Name(), pathTo, fileInfo.Size(), "private")
+	savedFile, err := uc.FileUseCase.CreateMultipart(ctx, file, fileInfo.Name(), pathTo, fileInfo.Size(), "private")
 	if err != nil {
 		return nil, err
 	}

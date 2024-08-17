@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"io"
 	"net/http"
@@ -42,6 +43,10 @@ func (uc *UseCase) UpgradeConnection(w http.ResponseWriter, r *http.Request) (*w
 
 func (uc *UseCase) Create(file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
 	return uc.FileInteractor.Create(file, name, path, size, fileType)
+}
+
+func (uc *UseCase) CreateMultipart(ctx context.Context, file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
+	return uc.FileInteractor.CreateMultipart(ctx, file, name, path, size, fileType)
 }
 
 func (uc *UseCase) Get(name string) ([]byte, error) {
