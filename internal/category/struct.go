@@ -12,13 +12,18 @@ type Category struct {
 }
 
 func (cat *Category) Scan(value interface{}) error {
-	catId, ok := value.(int64)
-	if !ok {
+	var catId interface{}
+
+	switch x := value.(type) {
+	case int64, uint64:
+		catId = x
+		break
+	default:
 		return fmt.Errorf("can't scan category of type %v with id %v", reflect.TypeOf(value), value)
 	}
 
 	for _, category := range Categories {
-		if category.ID == uint(catId) {
+		if category.ID == catId {
 			*cat = category
 			break
 		}
