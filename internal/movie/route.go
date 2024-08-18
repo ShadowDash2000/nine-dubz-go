@@ -64,5 +64,13 @@ func (h *Handler) Routes(r chi.Router) {
 				With(h.UserHandler.IsAuthorized).
 				Get("/", h.GetMultipleSubscribedHandler)
 		})
+		r.Route("/channel", func(r chi.Router) {
+			r.
+				With(pagination.SetPaginationContextMiddleware).
+				With(sorting.SetSortContextMiddleware).
+				Route("/{channelId}", func(r chi.Router) {
+					r.Get("/", h.GetMultipleByChannelHandler)
+				})
+		})
 	})
 }

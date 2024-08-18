@@ -4,6 +4,7 @@ import (
 	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"mime/multipart"
+	"nine-dubz/internal/category"
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
 	"nine-dubz/internal/video"
@@ -13,27 +14,28 @@ import (
 
 type Movie struct {
 	gorm.Model
-	ID                   uint          `json:"ID"`
-	Status               string        `json:"-" gorm:"default:'uploading'"`
-	CreatedAt            time.Time     `json:"createdAt"`
-	Code                 string        `json:"code"`
-	IsPublished          bool          `json:"-" gorm:"default:false"`
-	Description          string        `json:"description"`
-	PreviewId            *uint         `json:"-"`
-	Preview              *file.File    `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
-	PreviewWebpId        *uint         `json:"-"`
-	PreviewWebp          *file.File    `json:"previewWebp,omitempty" gorm:"foreignKey:PreviewWebpId;references:ID;"`
-	DefaultPreviewId     *uint         `json:"-"`
-	DefaultPreview       *file.File    `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
-	DefaultPreviewWebpId *uint         `json:"-"`
-	DefaultPreviewWebp   *file.File    `json:"defaultPreviewWebp" gorm:"foreignKey:DefaultPreviewWebpId;references:ID;"`
-	Name                 string        `json:"name"`
-	Videos               []video.Video `gorm:"many2many:movie_videos"`
-	UserId               uint          `json:"-"`
-	User                 user.User     `json:"-" gorm:"foreignKey:UserId;references:ID"`
-	WebVttId             *uint         `json:"-"`
-	WebVtt               *file.File    `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
-	Views                []view.View   `gorm:"-"`
+	ID                   uint              `json:"ID"`
+	Status               string            `json:"-" gorm:"default:'uploading'"`
+	CreatedAt            time.Time         `json:"createdAt"`
+	Code                 string            `json:"code"`
+	IsPublished          bool              `json:"-" gorm:"default:false"`
+	Description          string            `json:"description"`
+	PreviewId            *uint             `json:"-"`
+	Preview              *file.File        `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;"`
+	PreviewWebpId        *uint             `json:"-"`
+	PreviewWebp          *file.File        `json:"previewWebp,omitempty" gorm:"foreignKey:PreviewWebpId;references:ID;"`
+	DefaultPreviewId     *uint             `json:"-"`
+	DefaultPreview       *file.File        `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;"`
+	DefaultPreviewWebpId *uint             `json:"-"`
+	DefaultPreviewWebp   *file.File        `json:"defaultPreviewWebp" gorm:"foreignKey:DefaultPreviewWebpId;references:ID;"`
+	Name                 string            `json:"name"`
+	Videos               []video.Video     `gorm:"many2many:movie_videos"`
+	UserId               uint              `json:"-"`
+	User                 user.User         `json:"-" gorm:"foreignKey:UserId;references:ID"`
+	Category             category.Category `gorm:"default:1;not null"`
+	WebVttId             *uint             `json:"-"`
+	WebVtt               *file.File        `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
+	Views                []view.View       `gorm:"-"`
 }
 
 const (
@@ -84,6 +86,7 @@ type GetResponse struct {
 	DefaultPreviewWebp *file.File              `json:"defaultPreviewWebp"`
 	Name               string                  `json:"name"`
 	Videos             []*video.GetResponse    `json:"videos"`
+	Category           category.Category       `json:"category"`
 	WebVtt             *file.File              `json:"webVtt"`
 	User               *user.GetPublicResponse `json:"user"`
 	Subscribed         bool                    `json:"subscribed"`
@@ -102,6 +105,7 @@ func NewGetResponse(movie *Movie) *GetResponse {
 		DefaultPreviewWebp: movie.DefaultPreviewWebp,
 		Name:               movie.Name,
 		Videos:             video.NewGetResponseMultiple(movie.Videos),
+		Category:           movie.Category,
 		WebVtt:             movie.WebVtt,
 		User:               user.NewGetPublicResponse(&movie.User),
 	}
@@ -163,6 +167,7 @@ type UpdateRequest struct {
 	PreviewHeader *multipart.FileHeader `json:"-"`
 	RemovePreview bool                  `json:"-"`
 	Name          string                `json:"name,omitempty"`
+	Category      category.Category     `json:"category,omitempty"`
 }
 
 func NewUpdateRequest(movie *UpdateRequest) *Movie {
@@ -171,6 +176,7 @@ func NewUpdateRequest(movie *UpdateRequest) *Movie {
 		IsPublished: movie.IsPublished,
 		Description: movie.Description,
 		Name:        movie.Name,
+		Category:    movie.Category,
 	}
 }
 

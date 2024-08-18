@@ -36,10 +36,10 @@ func (uc *UseCase) Save(ctx context.Context, filePath, pathTo string, qualityId 
 	width, height, _ := ffmpegthumbs.GetVideoSize(filePath)
 
 	video := &Video{
-		Width:     width,
-		Height:    height,
-		File:      savedFile,
-		QualityID: qualityId,
+		Width:   width,
+		Height:  height,
+		File:    savedFile,
+		Quality: Quality{ID: qualityId},
 	}
 	err = uc.VideoInteractor.Create(video)
 	if err != nil {

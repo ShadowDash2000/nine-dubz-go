@@ -161,6 +161,11 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	movieUpdateRequest.Name = r.PostForm.Get("name")
 	movieUpdateRequest.Description = r.PostForm.Get("description")
 
+	categoryId, err := strconv.ParseUint(r.PostForm.Get("category"), 10, 32)
+	if err == nil {
+		movieUpdateRequest.Category.ID = uint(categoryId)
+	}
+
 	isPublished, err := strconv.ParseBool(r.PostForm.Get("isPublished"))
 	if err == nil {
 		movieUpdateRequest.IsPublished = isPublished
@@ -248,7 +253,31 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
 	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
-	moviesResponse, err := h.MovieUseCase.GetMultiple(pagination, sorting)
+	moviesResponse, err := h.MovieUseCase.GetMultiple("", pagination, sorting)
+	if err != nil {
+		render.Status(r, http.StatusNotFound)
+		render.JSON(w, r, make([]struct{}, 0))
+		return
+	}
+
+	if len(moviesResponse) > 0 {
+		render.JSON(w, r, moviesResponse)
+	} else {
+		render.Status(r, http.StatusOK)
+		render.JSON(w, r, make([]struct{}, 0))
+	}
+}
+
+func (h *Handler) GetMultipleByChannelHandler(w http.ResponseWriter, r *http.Request) {
+	pagination := r.Context().Value("pagination").(*pagination.Pagination)
+	sorting := r.Context().Value("sorting").(*sorting.Sort)
+	channelId, err := strconv.ParseUint(chi.URLParam(r, "channelId"), 10, 32)
+	if err != nil {
+		response.RenderError(w, r, http.StatusBadRequest, "Invalid Channel ID")
+		return
+	}
+
+	moviesResponse, err := h.MovieUseCase.GetMultiple(map[string]interface{}{"user_id": channelId}, pagination, sorting)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
@@ -346,7 +375,7 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 
 	var file *file.File
 	for _, video := range movie.Videos {
-		if video.Quality != nil && video.Quality.Code == quality {
+		if video.Quality.Code == quality {
 			file = video.File
 			break
 		}
