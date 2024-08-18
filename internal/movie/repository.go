@@ -196,7 +196,7 @@ func (mr *Repository) GetPreloadWhereMultiple(preloads []string, whereQuery inte
 		Offset(pagination.Offset).
 		Where(whereQuery).
 		Order(order).
-		First(&movies)
+		Find(&movies)
 
 	return movies, result.Error
 }

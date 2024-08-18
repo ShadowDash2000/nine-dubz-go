@@ -253,7 +253,9 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
 	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
-	moviesResponse, err := h.MovieUseCase.GetMultiple("", pagination, sorting)
+	moviesResponse, err := h.MovieUseCase.GetMultiple(
+		map[string]interface{}{"is_published": 1}, pagination, sorting,
+	)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
