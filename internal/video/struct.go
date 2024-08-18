@@ -1,26 +1,29 @@
 package video
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"nine-dubz/internal/file"
 	"nine-dubz/pkg/ffmpegthumbs"
+	"reflect"
 	"sort"
 )
 
 type Video struct {
 	gorm.Model
-	ID        uint
-	QualityID uint   `json:"-"`
-	Title     string `gorm:"-"`
-	Width     int
-	Height    int
-	FileID    uint
-	File      *file.File
+	ID      uint
+	Quality Quality `json:"-"`
+	Title   string  `gorm:"-"`
+	Width   int
+	Height  int
+	FileID  uint
+	File    *file.File
 }
 
 type GetResponse struct {
-	Quality *Quality   `json:"quality"`
+	Quality Quality    `json:"quality"`
 	Width   int        `json:"width"`
 	Height  int        `json:"height"`
 	File    *file.File `json:"file"`
@@ -28,7 +31,7 @@ type GetResponse struct {
 
 func NewGetResponse(video Video) *GetResponse {
 	return &GetResponse{
-		Quality: GetQuality(video.QualityID),
+		Quality: video.Quality,
 		Width:   video.Width,
 		Height:  video.Height,
 		File:    video.File,
@@ -122,6 +125,32 @@ func GetQuality(id uint) *Quality {
 	}
 
 	return nil
+}
+
+func (q *Quality) Scan(value interface{}) error {
+	qualityId, ok := value.(int64)
+	if !ok {
+		return fmt.Errorf("can't scan category of type %v with id %v", reflect.TypeOf(value), value)
+	}
+
+	for _, quality := range SupportedQualities {
+		if quality.ID == uint(qualityId) {
+			*q = quality
+			break
+		}
+	}
+
+	return nil
+}
+
+func (q Quality) Value() (driver.Value, error) {
+	for _, quality := range SupportedQualities {
+		if q.ID == quality.ID {
+			return int64(q.ID), nil
+		}
+	}
+
+	return nil, fmt.Errorf("quality with id %d not found", q.ID)
 }
 
 var SupportedQualities = []Quality{

@@ -207,7 +207,7 @@ func (uc *UseCase) RetryVideoPostProcess() {
 	for _, movie := range *movies {
 		var tmpVideo *video.Video
 		for _, video := range movie.Videos {
-			if video.QualityID == 1 {
+			if video.Quality.ID == 1 {
 				tmpVideo = &video
 				break
 			}
@@ -251,7 +251,7 @@ func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *o
 		movie, err := uc.MovieInteractor.Get(movie.Code)
 		if err == nil {
 			for _, video := range movie.Videos {
-				if video.QualityID == 1 {
+				if video.Quality.ID == 1 {
 					err = uc.VideoUseCase.Delete(&video)
 					break
 				}
@@ -361,7 +361,7 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 	var savedVideo *video.Video
 	var qualitiesIds []uint
 	for _, movieVideo := range movie.Videos {
-		qualitiesIds = append(qualitiesIds, movieVideo.QualityID)
+		qualitiesIds = append(qualitiesIds, movieVideo.Quality.ID)
 	}
 
 	videosSavePath := "movie/" + movie.Code
@@ -421,6 +421,10 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 	}
 	if utf8.RuneCountInString(movie.Description) > 0 {
 		selectQuery = append(selectQuery, "Description")
+	}
+
+	if movie.Category.ID > 0 {
+		selectQuery = append(selectQuery, "Category")
 	}
 
 	if movie.PreviewHeader != nil && movie.PreviewHeader.Size > 0 {
@@ -675,7 +679,7 @@ func (uc *UseCase) GetForUser(userId uint, code string) (*GetForUserResponse, er
 	return NewGetForUserResponse(movie), nil
 }
 
-func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
+func (uc *UseCase) GetMultiple(where interface{}, pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
 	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
 	}
@@ -687,7 +691,9 @@ func (uc *UseCase) GetMultiple(pagination *pagination.Pagination, sorting *sorti
 		order = "created_at desc"
 	}
 
-	movies, err := uc.MovieInteractor.GetMultiple(
+	movies, err := uc.MovieInteractor.GetPreloadWhereMultiple(
+		[]string{"Preview", "PreviewWebp", "DefaultPreview", "DefaultPreviewWebp", "WebVtt", "User", "User.Picture"},
+		where,
 		pagination,
 		order,
 	)
