@@ -253,9 +253,7 @@ func (h *Handler) GetMultipleHandler(w http.ResponseWriter, r *http.Request) {
 	pagination := r.Context().Value("pagination").(*pagination.Pagination)
 	sorting := r.Context().Value("sorting").(*sorting.Sort)
 
-	moviesResponse, err := h.MovieUseCase.GetMultiple(
-		map[string]interface{}{"is_published": 1}, pagination, sorting,
-	)
+	moviesResponse, err := h.MovieUseCase.GetMultiplePublic(pagination, sorting)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
@@ -279,7 +277,7 @@ func (h *Handler) GetMultipleByChannelHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	moviesResponse, err := h.MovieUseCase.GetMultiple(map[string]interface{}{"user_id": channelId}, pagination, sorting)
+	moviesResponse, err := h.MovieUseCase.GetMultipleByChannel(uint(channelId), pagination, sorting)
 	if err != nil {
 		render.Status(r, http.StatusNotFound)
 		render.JSON(w, r, make([]struct{}, 0))
