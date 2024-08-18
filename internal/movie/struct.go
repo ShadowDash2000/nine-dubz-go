@@ -32,7 +32,7 @@ type Movie struct {
 	Videos               []video.Video     `gorm:"many2many:movie_videos"`
 	UserId               uint              `json:"-"`
 	User                 user.User         `json:"-" gorm:"foreignKey:UserId;references:ID"`
-	Category             category.Category `gorm:"default:1;not null"`
+	Category             category.Category `gorm:"default:1;"`
 	WebVttId             *uint             `json:"-"`
 	WebVtt               *file.File        `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;"`
 	Views                []view.View       `gorm:"-"`
