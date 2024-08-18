@@ -552,7 +552,7 @@ func (uc *UseCase) Get(userId *uint, code string) (*GetResponse, error) {
 		return nil, err
 	}
 
-	if movie.IsPublished || movie.UserId == *userId {
+	if movie.IsPublished || (userId != nil && movie.UserId == *userId) {
 		response := NewGetResponse(movie)
 
 		return response, nil
@@ -567,7 +567,7 @@ func (uc *UseCase) GetPublic(userId *uint, code string, userIp net.IP) (*GetResp
 		return nil, err
 	}
 
-	if movie.IsPublished || movie.UserId == *userId {
+	if movie.IsPublished || (userId != nil && movie.UserId == *userId) {
 		response := NewGetResponse(movie)
 
 		viewsCount, err := uc.ViewUseCase.GetCount(movie.ID)
@@ -742,6 +742,18 @@ func (uc *UseCase) GetMultiple(where interface{}, pagination *pagination.Paginat
 	return moviesPayload, nil
 }
 
+func (uc *UseCase) GetMultipleByChannel(channelId uint, pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
+	return uc.GetMultiple(
+		map[string]interface{}{"is_published": 1, "user_id": channelId},
+		pagination,
+		sorting,
+	)
+}
+
+func (uc *UseCase) GetMultiplePublic(pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
+	return uc.GetMultiple(map[string]interface{}{"is_published": 1}, pagination, sorting)
+}
+
 func (uc *UseCase) GetMultipleSubscribed(userId uint, pagination *pagination.Pagination) ([]*GetResponse, error) {
 	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
@@ -759,7 +771,7 @@ func (uc *UseCase) GetMultipleSubscribed(userId uint, pagination *pagination.Pag
 
 	movies, err := uc.MovieInteractor.GetPreloadWhereMultiple(
 		[]string{"Preview", "PreviewWebp", "DefaultPreview", "DefaultPreviewWebp", "WebVtt", "User", "User.Picture"},
-		map[string]interface{}{"user_id": usersIds},
+		map[string]interface{}{"is_published": 1, "user_id": usersIds},
 		pagination,
 		"created_at desc",
 	)
