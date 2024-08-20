@@ -14,7 +14,7 @@ func (r *Repository) Create(sub *Subscription) error {
 }
 
 func (r *Repository) Delete(userId, channelId uint) (int64, error) {
-	result := r.DB.Delete(&Subscription{}, "user_id = ? AND channel_id = ?", userId, channelId)
+	result := r.DB.Unscoped().Delete(&Subscription{}, "user_id = ? AND channel_id = ?", userId, channelId)
 
 	return result.RowsAffected, result.Error
 }

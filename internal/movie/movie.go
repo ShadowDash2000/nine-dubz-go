@@ -165,10 +165,9 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 	}
 
 	ctx, cancel := context.WithCancel(context.TODO())
-	group, groupCtx := uc.Pool.GroupContext(ctx)
-	uc.MoviePool[movie.Code] = PoolItem{groupCtx, cancel}
+	uc.MoviePool[movie.Code] = PoolItem{ctx, cancel}
 
-	savedVideo, err := uc.VideoUseCase.Save(groupCtx, tmpFile.Name(), "movie/"+movie.Code, quality.ID)
+	savedVideo, err := uc.VideoUseCase.Save(ctx, tmpFile.Name(), "movie/"+movie.Code, quality.ID)
 	if err != nil {
 		uc.Delete(movie.Code)
 		return err
@@ -176,16 +175,16 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 
 	err = uc.MovieInteractor.AppendAssociation(&Movie{ID: movie.ID}, "Videos", savedVideo)
 	if err != nil {
+		uc.VideoUseCase.Delete(savedVideo)
 		uc.Delete(movie.Code)
 		return errors.New("failed to update video")
 	}
 
 	movie.Videos = append(movie.Videos, *savedVideo)
 
-	group.Submit(func() error {
-		err = uc.PostProcessVideo(groupCtx, *movie, tmpFile)
+	uc.Pool.Submit(func() {
+		uc.PostProcessVideo(ctx, *movie, tmpFile)
 		delete(uc.MoviePool, movie.Code)
-		return err
 	})
 
 	return nil
@@ -230,12 +229,10 @@ func (uc *UseCase) RetryVideoPostProcess() {
 		movieCopy := movie
 
 		ctx, cancel := context.WithCancel(context.TODO())
-		group, groupCtx := uc.Pool.GroupContext(ctx)
-		uc.MoviePool[movie.Code] = PoolItem{groupCtx, cancel}
-		group.Submit(func() error {
-			err = uc.PostProcessVideo(groupCtx, movieCopy, tmpFile)
+		uc.MoviePool[movie.Code] = PoolItem{ctx, cancel}
+		uc.Pool.Submit(func() {
+			uc.PostProcessVideo(ctx, movieCopy, tmpFile)
 			delete(uc.MoviePool, movie.Code)
-			return err
 		})
 	}
 }
@@ -252,7 +249,7 @@ func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *o
 		if err == nil {
 			for _, video := range movie.Videos {
 				if video.Quality.ID == 1 {
-					err = uc.VideoUseCase.Delete(&video)
+					uc.VideoUseCase.Delete(&video)
 					break
 				}
 			}
@@ -260,7 +257,7 @@ func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *o
 	}()
 
 	// Thumbs
-	if err := uc.CreateThumbnails(movie, thumbsPath, tmpFile); err != nil {
+	if err := uc.CreateThumbnails(ctx, movie, thumbsPath, tmpFile); err != nil {
 		uc.Delete(movie.Code)
 		return err
 	}
@@ -274,7 +271,7 @@ func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *o
 	return nil
 }
 
-func (uc *UseCase) CreateThumbnails(movie Movie, thumbsPath string, tmpFile *os.File) error {
+func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath string, tmpFile *os.File) error {
 	if movie.WebVtt != nil {
 		return nil
 	}
@@ -297,20 +294,25 @@ func (uc *UseCase) CreateThumbnails(movie Movie, thumbsPath string, tmpFile *os.
 		defaultPreviewPos = len(items) / 2
 	}
 	for i, item := range items {
-		if item.IsDir() {
-			continue
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if item.IsDir() {
+				continue
+			}
+
+			imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
+			imageFileInfo, _ := imageFile.Stat()
+			savedImageFile, _ := uc.FileUseCase.Create(imageFile, item.Name(), thumbsSavePath, imageFileInfo.Size(), "public")
+			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
+
+			if defaultPreviewPos == i+1 {
+				preview = savedImageFile
+			}
+
+			imageFile.Close()
 		}
-
-		imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
-		imageFileInfo, _ := imageFile.Stat()
-		savedImageFile, _ := uc.FileUseCase.Create(imageFile, item.Name(), thumbsSavePath, imageFileInfo.Size(), "public")
-		imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
-
-		if defaultPreviewPos == i+1 {
-			preview = savedImageFile
-		}
-
-		imageFile.Close()
 	}
 
 	if len(imagesFilePath) == 0 {
@@ -318,21 +320,9 @@ func (uc *UseCase) CreateThumbnails(movie Movie, thumbsPath string, tmpFile *os.
 	}
 
 	if preview != nil {
-		err = ffmpegthumbs.ToWebp(
-			filepath.Join(thumbsPath, preview.OriginalName),
-			thumbsPath,
-			preview.OriginalName,
+		previewWebp, _ = uc.FileUseCase.ImageToWebp(
+			filepath.Join(thumbsPath, preview.OriginalName), preview.OriginalName, thumbsSavePath,
 		)
-		if err == nil {
-			webpFile, err := os.Open(filepath.Join(thumbsPath, preview.OriginalName+".webp"))
-			if err == nil {
-				webpFileInfo, _ := webpFile.Stat()
-				previewWebp, _ = uc.FileUseCase.Create(
-					webpFile, webpFileInfo.Name(), thumbsSavePath, webpFileInfo.Size(), "public",
-				)
-				webpFile.Close()
-			}
-		}
 	}
 
 	var savedVttFile *file.File
@@ -471,24 +461,12 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		if previewFileType == "image/gif" {
 			movieRequest.PreviewWebpId = &preview.ID
 		} else {
-			err = ffmpegthumbs.ToWebp(
-				previewFile.Name(),
-				previewsPath,
-				preview.OriginalName,
+			previewWebp, err := uc.FileUseCase.ImageToWebp(
+				previewFile.Name(), preview.OriginalName, "movie/"+movie.Code,
 			)
-			if err != nil {
-				return err
+			if err == nil {
+				movieRequest.PreviewWebpId = &previewWebp.ID
 			}
-			webpFile, err := os.Open(filepath.Join(previewsPath, preview.OriginalName+".webp"))
-			if err != nil {
-				return err
-			}
-			webpFileInfo, _ := webpFile.Stat()
-			previewWebp, _ := uc.FileUseCase.Create(
-				webpFile, webpFileInfo.Name(), "movie/"+movie.Code, webpFileInfo.Size(), "public",
-			)
-			webpFile.Close()
-			movieRequest.PreviewWebpId = &previewWebp.ID
 		}
 
 		movieRequest.PreviewId = &preview.ID

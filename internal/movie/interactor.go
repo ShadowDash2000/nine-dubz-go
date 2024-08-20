@@ -13,7 +13,6 @@ type Interactor interface {
 	UpdatesSelectWhere(movie *Movie, selectQuery, whereQuery interface{}) (int64, error)
 	AppendAssociation(movie *Movie, association string, append interface{}) error
 	Get(code string) (*Movie, error)
-	GetUnscoped(code string) (*Movie, error)
 	GetWhere(where interface{}) (*Movie, error)
 	GetSelectWhere(selectQuery, where interface{}) (*Movie, error)
 	GetWhereCount(where interface{}) (int64, error)

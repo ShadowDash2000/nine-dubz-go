@@ -16,7 +16,7 @@ func (mr *Repository) Add(movie *Movie) error {
 }
 
 func (mr *Repository) Delete(id uint) error {
-	return mr.DB.Delete(&Movie{ID: id}).Error
+	return mr.DB.Select("Videos").Delete(&Movie{ID: id}).Error
 }
 
 func (mr *Repository) Save(movie *Movie) error {
@@ -60,22 +60,6 @@ func (mr *Repository) Get(code string) (*Movie, error) {
 		Preload("WebVtt").
 		Preload("User").
 		Preload("User.Picture").
-		First(&movie, "code = ?", code)
-
-	return movie, result.Error
-}
-
-func (mr *Repository) GetUnscoped(code string) (*Movie, error) {
-	movie := &Movie{}
-	result := mr.DB.
-		Unscoped().
-		Preload("Videos").
-		Preload("Videos.File").
-		Preload("Preview").
-		Preload("PreviewWebp").
-		Preload("DefaultPreview").
-		Preload("DefaultPreviewWebp").
-		Preload("WebVtt").
 		First(&movie, "code = ?", code)
 
 	return movie, result.Error

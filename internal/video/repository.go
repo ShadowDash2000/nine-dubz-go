@@ -18,5 +18,5 @@ func (r *Repository) GetWhere(where interface{}) (*Video, error) {
 }
 
 func (r *Repository) Delete(id uint) error {
-	return r.DB.Select("File").Delete(&Video{ID: id}).Error
+	return r.DB.Delete(&Video{ID: id}).Error
 }

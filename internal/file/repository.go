@@ -135,7 +135,7 @@ func (fr *Repository) Delete(name string) error {
 		return err
 	}
 
-	result := fr.DB.Delete(&File{}, "name = ?", name)
+	result := fr.DB.Unscoped().Delete(&File{}, "name = ?", name)
 
 	if result.Error == nil {
 		fr.S3Storage.DeleteObject(name, file.Path)
@@ -145,7 +145,7 @@ func (fr *Repository) Delete(name string) error {
 }
 
 func (fr *Repository) DeleteMultiple(names []string, path string) error {
-	result := fr.DB.Delete(&File{}, "name IN ?", names)
+	result := fr.DB.Unscoped().Delete(&File{}, "name IN ?", names)
 
 	if result.Error == nil {
 		fr.S3Storage.DeleteObjects(names, path)
@@ -155,7 +155,7 @@ func (fr *Repository) DeleteMultiple(names []string, path string) error {
 }
 
 func (fr *Repository) DeleteAllInPath(path string) error {
-	result := fr.DB.Delete(&File{}, "path = ?", path)
+	result := fr.DB.Unscoped().Delete(&File{}, "path = ?", path)
 
 	if result.Error == nil {
 		fr.S3Storage.DeleteAllInPrefix(path)
