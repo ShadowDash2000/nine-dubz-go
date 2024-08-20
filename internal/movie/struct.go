@@ -89,7 +89,7 @@ type GetResponse struct {
 	Category           category.Category       `json:"category"`
 	WebVtt             *file.File              `json:"webVtt"`
 	User               *user.GetPublicResponse `json:"user"`
-	Subscribed         bool                    `json:"subscribed"`
+	Subscribed         *bool                   `json:"subscribed,omitempty"`
 	Views              int64                   `json:"views"`
 }
 

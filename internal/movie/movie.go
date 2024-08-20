@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/alitto/pond"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 	"gorm.io/gorm"
@@ -555,7 +556,9 @@ func (uc *UseCase) GetPublic(userId *uint, code string, userIp net.IP) (*GetResp
 
 		if userId != nil {
 			subscription, _ := uc.SubscriptionUseCase.Get(*userId, movie.UserId)
-			response.Subscribed = subscription.ID > 0
+			if subscription != nil {
+				response.Subscribed = ptr.Bool(subscription.ID > 0)
+			}
 		}
 
 		view, err := uc.ViewUseCase.Add(movie.ID, userId, userIp)
