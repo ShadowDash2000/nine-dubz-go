@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"net/http"
+	"nine-dubz/pkg/ffmpegthumbs"
 	"nine-dubz/pkg/s3storage"
 	"os"
 	"path/filepath"
@@ -124,4 +125,30 @@ func (uc *UseCase) DownloadFile(pathTo, name, pathFrom string, file *File) (*os.
 	}
 
 	return tmpFile, nil
+}
+
+func (uc *UseCase) ImageToWebp(imagePath, name, savePath string) (*File, error) {
+	path := filepath.Join("upload/image/", savePath)
+	err := ffmpegthumbs.ToWebp(
+		imagePath,
+		path,
+		name,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	webpImage, err := os.Open(filepath.Join(path, name+".webp"))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = webpImage.Close()
+		if err == nil {
+			os.Remove(path)
+		}
+	}()
+
+	webpImageInfo, _ := webpImage.Stat()
+	return uc.Create(webpImage, name+".webp", savePath, webpImageInfo.Size(), "public")
 }
