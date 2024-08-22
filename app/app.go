@@ -24,6 +24,7 @@ import (
 	"nine-dubz/internal/user"
 	"nine-dubz/internal/video"
 	"nine-dubz/internal/view"
+	"nine-dubz/pkg/etag"
 	"nine-dubz/pkg/language"
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
@@ -78,19 +79,27 @@ func (app *App) Start() {
 	subh := subscription.NewHandler(subuc, uh)
 
 	//app.Router.Use(middleware.Logger)
-	app.Router.Use(middleware.Recoverer)
-	app.Router.Use(middleware.URLFormat)
-	app.Router.Use(render.SetContentType(render.ContentTypeJSON))
-	app.Router.Use(language.SetLanguageContext)
+	app.Router.Use(
+		middleware.Recoverer,
+		middleware.URLFormat,
+		render.SetContentType(render.ContentTypeJSON),
+		language.SetLanguageContext,
+		etag.Etag,
+	)
+
+	isDev, ok := os.LookupEnv("IS_DEV")
+	if !ok {
+		isDev = "false"
+	}
 
 	app.Router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			/**
-			TODO remove in future
-			*/
-			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, HEAD")
+
+			if isDev == "true" {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, HEAD")
+			}
 
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusOK)
