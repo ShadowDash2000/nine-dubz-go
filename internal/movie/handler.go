@@ -358,6 +358,8 @@ func (h *Handler) UpdatePublishStatusHandler(w http.ResponseWriter, r *http.Requ
 		response.RenderError(w, r, http.StatusNotFound, "Movie not found")
 		return
 	}
+
+	response.RenderSuccess(w, r, http.StatusOK, "")
 }
 
 func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
