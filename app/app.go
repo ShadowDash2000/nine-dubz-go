@@ -91,12 +91,13 @@ func (app *App) Start() {
 	if !ok {
 		isDev = "false"
 	}
+	allowOrigin, _ := os.LookupEnv("ALLOW_ORIGIN")
 
 	app.Router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			if isDev == "true" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, HEAD")
 			}
