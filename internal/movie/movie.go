@@ -662,7 +662,7 @@ func (uc *UseCase) GetForUser(userId uint, code string) (*GetForUserResponse, er
 
 func (uc *UseCase) GetMultiple(where interface{}, pagination *pagination.Pagination, sorting *sorting.Sort) ([]*GetResponse, error) {
 	if pagination.Limit > 20 || pagination.Limit == -1 {
-		pagination.Limit = 20
+		pagination.Limit = 100
 	}
 
 	order := ""
