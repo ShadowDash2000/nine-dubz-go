@@ -148,7 +148,7 @@ func (uc *UseCase) UpdatePicture(userId uint, file multipart.File, header *multi
 	}
 
 	pictureSavePath := fmt.Sprintf("user/inner/%d", userId)
-	picture, err := uc.FileUseCase.Create(file, header.Filename, pictureSavePath, header.Size, "public")
+	picture, err := uc.FileUseCase.Create(file, header.Filename, pictureSavePath, "public")
 	if err != nil {
 		return errors.New("INTERNAL_ERROR")
 	}

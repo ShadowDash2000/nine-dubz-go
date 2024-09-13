@@ -3,14 +3,12 @@ package file
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gorilla/websocket"
-	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"io"
+	"io/fs"
 	"math/rand"
 	"net/http"
-	"nine-dubz/pkg/s3storage"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,18 +17,35 @@ import (
 )
 
 type Repository struct {
-	DB        *gorm.DB
-	S3Storage *s3storage.S3Storage
+	DB *gorm.DB
 }
 
-func (fr *Repository) Create(file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
+const SaveFolderPrefix = "upload/"
+
+func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType string) (*File, error) {
 	timeNow := time.Now().UnixNano()
 	randomNumber := rand.Intn(1000)
 
 	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
 	extension := filepath.Ext(name)
 
-	_, err := fr.S3Storage.PutObject(file, newFileName+extension, path)
+	err := os.MkdirAll(filepath.Join(SaveFolderPrefix, path), os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.Create(filepath.Join(SaveFolderPrefix, path, newFileName+extension))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	fileInfo, err := os.Stat(f.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(f, file)
 	if err != nil {
 		return nil, err
 	}
@@ -39,46 +54,44 @@ func (fr *Repository) Create(file io.ReadSeeker, name, path string, size int64, 
 		Name:         newFileName,
 		Extension:    extension,
 		OriginalName: name,
-		Size:         size,
-		Path:         path,
+		Size:         fileInfo.Size(),
+		Path:         f.Name(),
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
 	if result.Error != nil {
-		fr.S3Storage.DeleteObject(newFileName, path)
-		return nil, err
+		return nil, result.Error
 	}
 
-	return savedFile, result.Error
+	return savedFile, nil
 }
 
-func (fr *Repository) CreateMultipart(ctx context.Context, file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
+func (fr *Repository) CreateFromPath(path string, fileType string) (*File, error) {
 	timeNow := time.Now().UnixNano()
 	randomNumber := rand.Intn(1000)
-
 	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
-	extension := filepath.Ext(name)
 
-	_, err := fr.S3Storage.MultipartUpload(ctx, file, size, newFileName+extension, path)
+	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 
+	extension := filepath.Ext(path)
+
 	savedFile := &File{
 		Name:         newFileName,
 		Extension:    extension,
-		OriginalName: name,
-		Size:         size,
+		OriginalName: fileInfo.Name(),
+		Size:         fileInfo.Size(),
 		Path:         path,
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
 	if result.Error != nil {
-		fr.S3Storage.DeleteObject(newFileName, path)
-		return nil, err
+		return nil, result.Error
 	}
 
-	return savedFile, result.Error
+	return savedFile, nil
 }
 
 func (fr *Repository) Get(name string) ([]byte, error) {
@@ -90,12 +103,9 @@ func (fr *Repository) Get(name string) ([]byte, error) {
 		return nil, err
 	}
 
-	output, err := fr.S3Storage.GetObject(name+file.Extension, file.Path)
-	if err != nil {
-		return nil, err
-	}
+	f, err := os.Open(file.Path)
 
-	buff, err := io.ReadAll(output.Body)
+	buff, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
@@ -103,28 +113,40 @@ func (fr *Repository) Get(name string) ([]byte, error) {
 	return buff, nil
 }
 
-func (fr *Repository) Stream(name, path, requestRange string) ([]byte, string, int64, error) {
-	var off int
+func (fr *Repository) Stream(file *File, requestRange string) ([]byte, string, int, error) {
+	f, err := os.Open(file.Path)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	defer f.Close()
+
+	var offset int64
 	if len(requestRange) > 0 {
 		requestRange = strings.Replace(requestRange, "bytes=", "", -1)
 		requestRange = strings.Replace(requestRange, "-", "", -1)
-		off, _ = strconv.Atoi(requestRange)
+		offset, _ = strconv.ParseInt(requestRange, 10, 64)
 	} else {
-		off = 0
+		offset = 0
 	}
 
-	buff := make([]byte, 1024*1024*5)
-
-	contentRange := strconv.Itoa(off) + "-" + strconv.Itoa(len(buff)+off)
-	output, err := fr.S3Storage.GetRangeObject(name, path, "bytes="+contentRange)
+	_, err = f.Seek(offset, 0)
 	if err != nil {
 		return nil, "", 0, err
 	}
 
-	contentRange = aws.ToString(output.ContentRange)
-	contentLength := aws.ToInt64(output.ContentLength)
+	buffSize := int64(1024 * 1024 * 5)
+	if buffSize+offset > file.Size {
+		buffSize = file.Size - offset
+	}
+	buff := make([]byte, buffSize)
+	contentLength, err := f.Read(buff)
+	if err != nil {
+		return nil, "", 0, err
+	}
 
-	buff, _ = io.ReadAll(output.Body)
+	contentRange := "bytes " + strconv.FormatInt(offset, 10) + "-" +
+		strconv.Itoa(int(offset)+contentLength-1) + "/" +
+		strconv.FormatInt(file.Size, 10)
 
 	return buff, contentRange, contentLength, nil
 }
@@ -136,29 +158,61 @@ func (fr *Repository) Delete(name string) error {
 	}
 
 	result := fr.DB.Unscoped().Delete(&File{}, "name = ?", name)
+	if result.Error != nil {
+		return result.Error
+	}
 
-	if result.Error == nil {
-		fr.S3Storage.DeleteObject(name, file.Path)
+	err = os.Remove(file.Path)
+	if err != nil {
+		return err
 	}
 
 	return result.Error
 }
 
-func (fr *Repository) DeleteMultiple(names []string, path string) error {
+func (fr *Repository) DeleteMultiple(names []string) error {
+	files, err := fr.GetWhereMultiple(map[string]interface{}{"name": names})
+	if err != nil {
+		return err
+	}
+
 	result := fr.DB.Unscoped().Delete(&File{}, "name IN ?", names)
 
-	if result.Error == nil {
-		fr.S3Storage.DeleteObjects(names, path)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	for _, file := range files {
+		err = os.Remove(file.Path)
+		if err != nil {
+			return err
+		}
 	}
 
 	return result.Error
 }
 
 func (fr *Repository) DeleteAllInPath(path string) error {
-	result := fr.DB.Unscoped().Delete(&File{}, "path = ?", path)
+	var paths []string
+	err := filepath.Walk(filepath.Join(SaveFolderPrefix, path), func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	if result.Error == nil {
-		fr.S3Storage.DeleteAllInPrefix(path)
+		if !info.IsDir() {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+
+	result := fr.DB.Unscoped().Delete(&File{}, map[string]interface{}{"path": paths})
+	if result.Error != nil {
+		return result.Error
+	}
+
+	err = os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
+	if err != nil {
+		return err
 	}
 
 	return result.Error
@@ -173,6 +227,13 @@ func (fr *Repository) Updates(file *File) error {
 func (fr *Repository) GetWhere(where map[string]interface{}) (*File, error) {
 	file := &File{}
 	result := fr.DB.Where(where).First(&file)
+
+	return file, result.Error
+}
+
+func (fr *Repository) GetWhereMultiple(where map[string]interface{}) ([]File, error) {
+	var file []File
+	result := fr.DB.Where(where).Find(&file)
 
 	return file, result.Error
 }

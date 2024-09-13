@@ -388,7 +388,7 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buff, contentRange, contentLength, err := h.FileUseCase.Stream(file.Name+file.Extension, file.Path, requestRange)
+	buff, contentRange, contentLength, err := h.FileUseCase.Stream(file, requestRange)
 	if err != nil {
 		response.RenderError(w, r, http.StatusNotFound, "File not found")
 		return
@@ -397,9 +397,9 @@ func (h *Handler) StreamFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Accept-Ranges", "bytes")
 	if len(requestRange) > 0 {
 		w.Header().Set("Content-Range", contentRange)
-		w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
+		w.Header().Set("Content-Length", strconv.Itoa(contentLength))
 	}
-	//w.Header().Set("Content-Type", "video/mp4")
+
 	w.WriteHeader(http.StatusPartialContent)
 	w.Write(buff)
 }
