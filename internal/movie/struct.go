@@ -21,20 +21,20 @@ type Movie struct {
 	IsPublished          bool              `json:"-" gorm:"default:false"`
 	Description          string            `json:"description"`
 	PreviewId            *uint             `json:"-"`
-	Preview              *file.File        `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;constraint:OnDelete:CASCADE;"`
+	Preview              *file.File        `json:"preview,omitempty" gorm:"foreignKey:PreviewId;references:ID;constraint:OnDelete:SET NULL;"`
 	PreviewWebpId        *uint             `json:"-"`
-	PreviewWebp          *file.File        `json:"previewWebp,omitempty" gorm:"foreignKey:PreviewWebpId;references:ID;constraint:OnDelete:CASCADE;"`
+	PreviewWebp          *file.File        `json:"previewWebp,omitempty" gorm:"foreignKey:PreviewWebpId;references:ID;constraint:OnDelete:SET NULL;"`
 	DefaultPreviewId     *uint             `json:"-"`
-	DefaultPreview       *file.File        `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;constraint:OnDelete:CASCADE;"`
+	DefaultPreview       *file.File        `json:"defaultPreview" gorm:"foreignKey:DefaultPreviewId;references:ID;constraint:OnDelete:SET NULL;"`
 	DefaultPreviewWebpId *uint             `json:"-"`
-	DefaultPreviewWebp   *file.File        `json:"defaultPreviewWebp" gorm:"foreignKey:DefaultPreviewWebpId;references:ID;constraint:OnDelete:CASCADE;"`
+	DefaultPreviewWebp   *file.File        `json:"defaultPreviewWebp" gorm:"foreignKey:DefaultPreviewWebpId;references:ID;constraint:OnDelete:SET NULL;"`
 	Name                 string            `json:"name"`
-	Videos               []video.Video     `gorm:"many2many:movie_videos;constraint:OnDelete:CASCADE;"`
+	Videos               []video.Video     `gorm:"many2many:movie_videos"`
 	UserId               uint              `json:"-"`
 	User                 user.User         `json:"-" gorm:"foreignKey:UserId;references:ID"`
 	Category             category.Category `gorm:"default:1;"`
 	WebVttId             *uint             `json:"-"`
-	WebVtt               *file.File        `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;constraint:OnDelete:CASCADE;"`
+	WebVtt               *file.File        `json:"webVtt" gorm:"foreignKey:WebVttId;references:ID;constraint:OnDelete:SET NULL;"`
 	Views                []view.View       `gorm:"-"`
 }
 

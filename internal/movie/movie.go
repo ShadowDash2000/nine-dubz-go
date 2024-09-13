@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"nine-dubz/internal/file"
@@ -27,6 +28,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -80,7 +82,8 @@ func (uc *UseCase) Add(movieAddRequest *AddRequest) (*AddResponse, error) {
 	movie := NewAddRequest(movieAddRequest)
 
 	hasher := sha256.New()
-	hasher.Write([]byte(time.Now().String()))
+	randomNumber := rand.Intn(1000)
+	hasher.Write([]byte(time.Now().String() + strconv.Itoa(randomNumber)))
 	hash := hasher.Sum(nil)
 
 	encoded := base64.URLEncoding.EncodeToString(hash)
@@ -154,7 +157,7 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 	quality := video.GetQuality(1)
 
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket(
-		filepath.Join("movies", movie.Code, "resize"),
+		filepath.Join("upload/movies", movie.Code, "resize"),
 		quality.Code+".mp4",
 		[]string{"video/mp4", "video/avi", "video/webm"},
 		header.Size,
@@ -238,7 +241,7 @@ func (uc *UseCase) RetryVideoPostProcess() {
 
 func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *os.File) error {
 	resizedVideoPath := filepath.Join("upload/movies", movie.Code, "resize")
-	thumbsPath := filepath.Join("movies", movie.Code, "thumbs")
+	thumbsPath := filepath.Join("upload/movies", movie.Code, "thumbs")
 
 	// Thumbs
 	if err := uc.CreateThumbnails(ctx, movie, thumbsPath, tmpFile); err != nil {
@@ -298,7 +301,7 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 			}
 
 			imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
-			savedImageFile, _ := uc.FileUseCase.Create(imageFile, item.Name(), thumbsPath, "public")
+			savedImageFile, _ := uc.FileUseCase.CreateFromPath(imageFile.Name(), "public")
 			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
 
 			if defaultPreviewPos == i+1 {
@@ -321,10 +324,11 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 
 	var savedVttFile *file.File
 	videoDuration, _ := ffmpegthumbs.GetVideoDuration(tmpFile.Name())
-	vttFile, _ := webvtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
-	vttFile, _ = os.Open(vttFile.Name())
-	savedVttFile, _ = uc.FileUseCase.Create(vttFile, vttFile.Name(), thumbsPath, "public")
-	vttFile.Close()
+	vttFile, err := webvtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
+	if err != nil {
+		return err
+	}
+	savedVttFile, _ = uc.FileUseCase.CreateFromPath(vttFile.Name(), "public")
 
 	movieUpdateRequest := &VideoUpdateRequest{
 		Code:               movie.Code,
@@ -438,7 +442,7 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		if previewFileType == "image/gif" {
 			movieRequest.PreviewWebpId = &preview.ID
 		} else {
-			previewWebp, err := uc.FileUseCase.ImageToWebp(preview.Path, preview.OriginalName, previewSavePath)
+			previewWebp, err := uc.FileUseCase.ImageToWebp(preview.Path, preview.Name, "upload/"+previewSavePath)
 			if err == nil {
 				movieRequest.PreviewWebpId = &previewWebp.ID
 			}
@@ -475,16 +479,10 @@ func (uc *UseCase) RemovePreview(code string) error {
 	}
 
 	if movie.Preview != nil {
-		err = uc.FileUseCase.Delete(movie.Preview.Name)
-		if err != nil {
-			return err
-		}
+		uc.FileUseCase.Delete(movie.Preview.Name)
 	}
 	if movie.PreviewWebp != nil {
-		err = uc.FileUseCase.Delete(movie.PreviewWebp.Name)
-		if err != nil {
-			return err
-		}
+		uc.FileUseCase.Delete(movie.PreviewWebp.Name)
 	}
 
 	return nil
