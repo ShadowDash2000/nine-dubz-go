@@ -116,7 +116,7 @@ func (uc *UseCase) Delete(code string) error {
 		return err
 	}
 
-	go uc.FileUseCase.DeleteAllInPath("movie/" + code)
+	go uc.FileUseCase.DeleteAllInPath("movies/" + code)
 
 	return nil
 }
@@ -154,7 +154,7 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 	quality := video.GetQuality(1)
 
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket(
-		filepath.Join("upload/resize", movie.Code),
+		filepath.Join("movies", movie.Code, "resize"),
 		quality.Code+".mp4",
 		[]string{"video/mp4", "video/avi", "video/webm"},
 		header.Size,
@@ -168,7 +168,7 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 	ctx, cancel := context.WithCancel(context.TODO())
 	uc.MoviePool[movie.Code] = PoolItem{ctx, cancel}
 
-	savedVideo, err := uc.VideoUseCase.Save(ctx, tmpFile.Name(), "movie/"+movie.Code, quality.ID)
+	savedVideo, err := uc.VideoUseCase.Save(tmpFile.Name(), quality.ID)
 	if err != nil {
 		uc.Delete(movie.Code)
 		return err
@@ -218,14 +218,12 @@ func (uc *UseCase) RetryVideoPostProcess() {
 			continue
 		}
 
-		tmpPath := filepath.Join("upload/resize", movie.Code)
-		tmpFile, err := uc.FileUseCase.DownloadFile(
-			tmpPath, tmpVideo.File.OriginalName, tmpVideo.File.Path, tmpVideo.File,
-		)
+		tmpFile, err := os.Open(tmpVideo.File.Path)
 		if err != nil {
 			uc.Delete(movie.Code)
-			break
+			continue
 		}
+		tmpFile.Close()
 
 		movieCopy := movie
 
@@ -239,23 +237,8 @@ func (uc *UseCase) RetryVideoPostProcess() {
 }
 
 func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *os.File) error {
-	resizedVideoPath := filepath.Join("upload/resize", movie.Code)
-	thumbsPath := filepath.Join("upload/thumbs/", movie.Code)
-
-	defer os.RemoveAll(resizedVideoPath)
-	defer os.RemoveAll(thumbsPath)
-	defer os.Remove(tmpFile.Name())
-	defer func() {
-		movie, err := uc.MovieInteractor.Get(movie.Code)
-		if err == nil {
-			for _, video := range movie.Videos {
-				if video.Quality.ID == 1 {
-					uc.VideoUseCase.Delete(&video)
-					break
-				}
-			}
-		}
-	}()
+	resizedVideoPath := filepath.Join("upload/movies", movie.Code, "resize")
+	thumbsPath := filepath.Join("movies", movie.Code, "thumbs")
 
 	// Thumbs
 	if err := uc.CreateThumbnails(ctx, movie, thumbsPath, tmpFile); err != nil {
@@ -268,6 +251,18 @@ func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *o
 		uc.Delete(movie.Code)
 		return err
 	}
+
+	os.Remove(tmpFile.Name())
+	for _, video := range movie.Videos {
+		if video.Quality.ID == 1 {
+			uc.VideoUseCase.Delete(&video)
+			break
+		}
+	}
+	/*movie, err := uc.MovieInteractor.Get(movie.Code)
+	if err == nil {
+
+	}*/
 
 	return nil
 }
@@ -284,7 +279,6 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 	}
 
 	thumbsWebvttPath := "/api/file/"
-	thumbsSavePath := fmt.Sprintf("movie/%s", movie.Code)
 	imagesFilePath := make([]string, 0)
 	var preview *file.File
 	var previewWebp *file.File
@@ -304,8 +298,7 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 			}
 
 			imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
-			imageFileInfo, _ := imageFile.Stat()
-			savedImageFile, _ := uc.FileUseCase.Create(imageFile, item.Name(), thumbsSavePath, imageFileInfo.Size(), "public")
+			savedImageFile, _ := uc.FileUseCase.Create(imageFile, item.Name(), thumbsPath, "public")
 			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
 
 			if defaultPreviewPos == i+1 {
@@ -322,7 +315,7 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 
 	if preview != nil {
 		previewWebp, _ = uc.FileUseCase.ImageToWebp(
-			filepath.Join(thumbsPath, preview.OriginalName), preview.OriginalName, thumbsSavePath,
+			preview.Path, preview.Name, thumbsPath,
 		)
 	}
 
@@ -330,7 +323,7 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 	videoDuration, _ := ffmpegthumbs.GetVideoDuration(tmpFile.Name())
 	vttFile, _ := webvtt.CreateFromFilePaths(imagesFilePath, thumbsPath, videoDuration, frameDuration)
 	vttFile, _ = os.Open(vttFile.Name())
-	savedVttFile, _ = uc.FileUseCase.Create(vttFile, vttFile.Name(), thumbsSavePath, 0, "public")
+	savedVttFile, _ = uc.FileUseCase.Create(vttFile, vttFile.Name(), thumbsPath, "public")
 	vttFile.Close()
 
 	movieUpdateRequest := &VideoUpdateRequest{
@@ -355,7 +348,6 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 		qualitiesIds = append(qualitiesIds, movieVideo.Quality.ID)
 	}
 
-	videosSavePath := "movie/" + movie.Code
 	_, videoHeight, _ := ffmpegthumbs.GetVideoSize(tmpFile.Name())
 
 	for _, quality := range video.SupportedQualities {
@@ -368,7 +360,7 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 		}
 
 		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Code+".mp4")
-		savedVideo, err = uc.VideoUseCase.Save(ctx, resizedWebmPath, videosSavePath, quality.ID)
+		savedVideo, err = uc.VideoUseCase.Save(resizedWebmPath, quality.ID)
 		if err != nil {
 			return err
 		}
@@ -435,26 +427,10 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 			return errors.New("invalid file type")
 		}
 
+		previewSavePath := filepath.Join("movies", movie.Code, "thumbs")
 		preview, err := uc.FileUseCase.Create(
-			movie.Preview, movie.PreviewHeader.Filename, "movie/"+movie.Code, movie.PreviewHeader.Size, "public",
+			movie.Preview, movie.PreviewHeader.Filename, previewSavePath, "public",
 		)
-		if err != nil {
-			return err
-		}
-
-		previewsPath := filepath.Join("upload/previews", movie.Code)
-		defer os.RemoveAll(previewsPath)
-
-		err = os.MkdirAll(previewsPath, os.ModePerm)
-		if err != nil {
-			return err
-		}
-		previewFile, err := os.Create(filepath.Join(previewsPath, preview.OriginalName))
-		if err != nil {
-			return err
-		}
-		defer previewFile.Close()
-		_, err = io.Copy(previewFile, movie.Preview)
 		if err != nil {
 			return err
 		}
@@ -462,9 +438,7 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		if previewFileType == "image/gif" {
 			movieRequest.PreviewWebpId = &preview.ID
 		} else {
-			previewWebp, err := uc.FileUseCase.ImageToWebp(
-				previewFile.Name(), preview.OriginalName, "movie/"+movie.Code,
-			)
+			previewWebp, err := uc.FileUseCase.ImageToWebp(preview.Path, preview.OriginalName, previewSavePath)
 			if err == nil {
 				movieRequest.PreviewWebpId = &previewWebp.ID
 			}

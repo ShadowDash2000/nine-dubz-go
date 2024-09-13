@@ -1,15 +1,11 @@
 package file
 
 import (
-	"errors"
-	"fmt"
 	"github.com/gorilla/websocket"
-	"golang.org/x/net/context"
 	"gorm.io/gorm"
 	"io"
 	"net/http"
 	"nine-dubz/pkg/ffmpegthumbs"
-	"nine-dubz/pkg/s3storage"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,8 +28,7 @@ func New(db *gorm.DB) *UseCase {
 
 	return &UseCase{
 		FileInteractor: &Repository{
-			DB:        db,
-			S3Storage: s3storage.NewS3Storage(),
+			DB: db,
 		},
 		IsDev: isDev,
 	}
@@ -54,28 +49,28 @@ func (uc *UseCase) UpgradeConnection(w http.ResponseWriter, r *http.Request) (*w
 	return connection, nil
 }
 
-func (uc *UseCase) Create(file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
-	return uc.FileInteractor.Create(file, name, path, size, fileType)
+func (uc *UseCase) Create(file io.ReadSeeker, name, path string, fileType string) (*File, error) {
+	return uc.FileInteractor.Create(file, name, path, fileType)
 }
 
-func (uc *UseCase) CreateMultipart(ctx context.Context, file io.ReadSeeker, name, path string, size int64, fileType string) (*File, error) {
-	return uc.FileInteractor.CreateMultipart(ctx, file, name, path, size, fileType)
+func (uc *UseCase) CreateFromPath(path string, fileType string) (*File, error) {
+	return uc.FileInteractor.CreateFromPath(path, fileType)
 }
 
 func (uc *UseCase) Get(name string) ([]byte, error) {
 	return uc.FileInteractor.Get(name)
 }
 
-func (uc *UseCase) Stream(name, path, requestRange string) ([]byte, string, int64, error) {
-	return uc.FileInteractor.Stream(name, path, requestRange)
+func (uc *UseCase) Stream(file *File, requestRange string) ([]byte, string, int, error) {
+	return uc.FileInteractor.Stream(file, requestRange)
 }
 
 func (uc *UseCase) Delete(name string) error {
 	return uc.FileInteractor.Delete(name)
 }
 
-func (uc *UseCase) DeleteMultiple(names []string, path string) error {
-	return uc.FileInteractor.DeleteMultiple(names, path)
+func (uc *UseCase) DeleteMultiple(names []string) error {
+	return uc.FileInteractor.DeleteMultiple(names)
 }
 
 func (uc *UseCase) DeleteAllInPath(path string) error {
@@ -100,47 +95,8 @@ func (uc *UseCase) WriteFileFromSocket(filePath, fileName string, fileTypes []st
 	return tmpFile, nil
 }
 
-func (uc *UseCase) DownloadFile(pathTo, name, pathFrom string, file *File) (*os.File, error) {
-	err := os.MkdirAll(pathTo, os.ModePerm)
-	if err != nil {
-		return nil, err
-	}
-	tmpFile, err := os.Create(filepath.Join(pathTo, name))
-	if err != nil {
-		return nil, err
-	}
-	defer tmpFile.Close()
-
-	var currentByte int64
-	for {
-		if currentByte >= file.Size {
-			break
-		}
-
-		requestRange := fmt.Sprintf("bytes=%d-", currentByte)
-		buff, _, contentLength, err := uc.FileInteractor.Stream(file.Name+file.Extension, pathFrom, requestRange)
-		if err != nil {
-			tmpFile.Close()
-			os.Remove(tmpFile.Name())
-			return nil, err
-		}
-
-		tmpFile.Write(buff)
-
-		currentByte = currentByte + contentLength
-	}
-
-	if currentByte < file.Size {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return nil, errors.New("file: file was corrupted while downloading")
-	}
-
-	return tmpFile, nil
-}
-
 func (uc *UseCase) ImageToWebp(imagePath, name, savePath string) (*File, error) {
-	path := filepath.Join("upload/image/", savePath)
+	path := filepath.Join("upload", savePath)
 	err := ffmpegthumbs.ToWebp(
 		imagePath,
 		path,
@@ -150,17 +106,5 @@ func (uc *UseCase) ImageToWebp(imagePath, name, savePath string) (*File, error) 
 		return nil, err
 	}
 
-	webpImage, err := os.Open(filepath.Join(path, name+".webp"))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = webpImage.Close()
-		if err == nil {
-			os.Remove(path)
-		}
-	}()
-
-	webpImageInfo, _ := webpImage.Stat()
-	return uc.Create(webpImage, name+".webp", savePath, webpImageInfo.Size(), "public")
+	return uc.CreateFromPath(filepath.Join(path, name+".webp"), "public")
 }

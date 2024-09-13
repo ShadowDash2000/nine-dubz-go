@@ -12,7 +12,7 @@ import (
 	"nine-dubz/internal/file"
 	"nine-dubz/internal/user"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 )
 
@@ -77,25 +77,20 @@ func (uc *UseCase) Register(registrationRequest *UserRegistrationRequest) (uint,
 	resp, err := http.Get(registrationRequest.PictureUrl)
 	if err == nil {
 		contentType := resp.Header.Get("Content-Type")
-		contentLength := resp.Header.Get("Content-Length")
 
-		pictureSize, err := strconv.Atoi(contentLength)
-		if err == nil {
-			pictureExt := strings.Split(contentType, "/")
-			if len(pictureExt) == 2 {
-				body, err := io.ReadAll(resp.Body)
+		pictureExt := strings.Split(contentType, "/")
+		if len(pictureExt) == 2 {
+			body, err := io.ReadAll(resp.Body)
+			if err == nil {
+				bodyReader := bytes.NewReader(body)
+				picture, err := uc.FileUseCase.Create(
+					bodyReader,
+					"google_img."+pictureExt[1],
+					filepath.Join("user/google", registrationRequest.Id),
+					"public",
+				)
 				if err == nil {
-					bodyReader := bytes.NewReader(body)
-					picture, err := uc.FileUseCase.Create(
-						bodyReader,
-						"google_img."+pictureExt[1],
-						"user/google/"+registrationRequest.Id,
-						int64(pictureSize),
-						"public",
-					)
-					if err == nil {
-						registrationPayload.Picture = picture
-					}
+					registrationPayload.Picture = picture
 				}
 			}
 		}
