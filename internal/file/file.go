@@ -96,15 +96,14 @@ func (uc *UseCase) WriteFileFromSocket(filePath, fileName string, fileTypes []st
 }
 
 func (uc *UseCase) ImageToWebp(imagePath, name, savePath string) (*File, error) {
-	path := filepath.Join("upload", savePath)
 	err := ffmpegthumbs.ToWebp(
 		imagePath,
-		path,
+		savePath,
 		name,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	return uc.CreateFromPath(filepath.Join(path, name+".webp"), "public")
+	return uc.CreateFromPath(filepath.Join(savePath, name+".webp"), "public")
 }

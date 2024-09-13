@@ -19,7 +19,7 @@ type Video struct {
 	Width   int
 	Height  int
 	FileID  uint
-	File    *file.File `gorm:"constraint:OnDelete:CASCADE;"`
+	File    *file.File `gorm:"constraint:OnDelete:SET NULL;"`
 }
 
 type GetResponse struct {
