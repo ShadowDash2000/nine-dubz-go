@@ -9,3 +9,5 @@ Back-end for the [Nine-Dubz](https://nine-dubz.ru/) website.
 - Video streaming via partial content
 - WEBVTT generation for video timeline thumbnails
 - SEO and video meta-data for embedded links
+
+[Front-end repository](https://github.com/UsGitHu611/nine-dubz-frontend)
