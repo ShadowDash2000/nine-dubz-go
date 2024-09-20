@@ -1,9 +1,11 @@
 package video
 
 import (
-	"gorm.io/gorm"
+	"context"
 	"nine-dubz/internal/file"
 	"nine-dubz/pkg/ffmpegthumbs"
+
+	"gorm.io/gorm"
 )
 
 type UseCase struct {
@@ -20,8 +22,8 @@ func New(db *gorm.DB, fuc *file.UseCase) *UseCase {
 	}
 }
 
-func (uc *UseCase) Save(filePath string, qualityId uint) (*Video, error) {
-	savedFile, err := uc.FileUseCase.CreateFromPath(filePath, "private")
+func (uc *UseCase) Save(ctx context.Context, filePath, name, path string, qualityId uint) (*Video, error) {
+	savedFile, err := uc.FileUseCase.CreateMultipart(ctx, filePath, name, path, "private")
 	if err != nil {
 		return nil, err
 	}

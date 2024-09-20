@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/url"
+	"os"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"io"
-	"net/url"
-	"os"
 )
 
 type S3Storage struct {
@@ -73,11 +74,11 @@ func (sr *S3Storage) GetS3Client() *s3.Client {
 	return client
 }
 
-func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, fileSize int64, key, prefix string) (*s3.CompleteMultipartUploadOutput, error) {
+func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, key, prefix string) (*s3.CompleteMultipartUploadOutput, int64, error) {
 	client := sr.GetS3Client()
 	key, err := url.JoinPath(prefix, key)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	ctx, _ = context.WithCancel(ctx)
@@ -86,7 +87,7 @@ func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, fi
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	abortMultipartUploadInput := &s3.AbortMultipartUploadInput{
@@ -100,11 +101,15 @@ func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, fi
 	chunkSize := 1024 * 1024 * 50
 	bytesRead := int64(0)
 	buff := make([]byte, chunkSize)
-	for bytesRead < fileSize {
+	for {
 		n, err := file.Read(buff)
-		if err != nil {
+		if err != nil && n < 0 {
+			if err == io.EOF {
+				break
+			}
+
 			client.AbortMultipartUpload(ctx, abortMultipartUploadInput)
-			return nil, err
+			return nil, 0, err
 		}
 		bytesRead += int64(n)
 
@@ -118,7 +123,7 @@ func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, fi
 		})
 		if err != nil {
 			client.AbortMultipartUpload(ctx, abortMultipartUploadInput)
-			return nil, err
+			return nil, 0, err
 		}
 
 		completedParts = append(completedParts, types.CompletedPart{
@@ -138,10 +143,10 @@ func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, fi
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return completeMultipartUploadOutput, nil
+	return completeMultipartUploadOutput, bytesRead, nil
 }
 
 func (sr *S3Storage) PutObject(file io.ReadSeeker, key, prefix string) (*s3.PutObjectOutput, error) {

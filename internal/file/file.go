@@ -1,14 +1,17 @@
 package file
 
 import (
-	"github.com/gorilla/websocket"
-	"gorm.io/gorm"
+	"context"
 	"io"
 	"net/http"
 	"nine-dubz/pkg/ffmpegthumbs"
+	"nine-dubz/pkg/s3storage"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/gorilla/websocket"
+	"gorm.io/gorm"
 )
 
 type UseCase struct {
@@ -25,10 +28,16 @@ func New(db *gorm.DB) *UseCase {
 	if err != nil {
 		isDev = false
 	}
+	saveType, ok := os.LookupEnv("FILE_SAVE_TYPE")
+	if !ok {
+		saveType = "local"
+	}
 
 	return &UseCase{
 		FileInteractor: &Repository{
-			DB: db,
+			DB:        db,
+			S3Storage: s3storage.NewS3Storage(),
+			SaveType:  saveType,
 		},
 		IsDev: isDev,
 	}
@@ -53,8 +62,12 @@ func (uc *UseCase) Create(file io.ReadSeeker, name, path string, fileType string
 	return uc.FileInteractor.Create(file, name, path, fileType)
 }
 
-func (uc *UseCase) CreateFromPath(path string, fileType string) (*File, error) {
-	return uc.FileInteractor.CreateFromPath(path, fileType)
+func (uc *UseCase) CreateMultipart(ctx context.Context, filePath, name, path, fileType string) (*File, error) {
+	return uc.FileInteractor.CreateMultipart(ctx, filePath, name, path, fileType)
+}
+
+func (uc *UseCase) CreateFromPath(filePath, name, path, fileType string) (*File, error) {
+	return uc.FileInteractor.CreateFromPath(filePath, name, path, fileType)
 }
 
 func (uc *UseCase) Get(name string) ([]byte, error) {
@@ -105,5 +118,11 @@ func (uc *UseCase) ImageToWebp(imagePath, name, savePath string) (*File, error) 
 		return nil, err
 	}
 
-	return uc.CreateFromPath(filepath.Join(savePath, name+".webp"), "public")
+	file, err := os.Open(filepath.Join(savePath, name+".webp"))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	return uc.Create(file, name+".webp", savePath, "public")
 }

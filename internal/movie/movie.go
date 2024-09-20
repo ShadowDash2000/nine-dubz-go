@@ -5,11 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/alitto/pond"
-	"github.com/aws/smithy-go/ptr"
-	"github.com/gorilla/websocket"
-	"golang.org/x/net/context"
-	"gorm.io/gorm"
 	"io"
 	"log"
 	"math/rand"
@@ -30,8 +25,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/alitto/pond"
+	"github.com/aws/smithy-go/ptr"
+	"github.com/gorilla/websocket"
+	"golang.org/x/net/context"
+	"gorm.io/gorm"
 )
 
 type UseCase struct {
@@ -43,6 +45,7 @@ type UseCase struct {
 	ViewUseCase         *view.UseCase
 	SubscriptionUseCase *subscription.UseCase
 	MoviePool           map[string]PoolItem
+	Mutex               *sync.RWMutex
 }
 
 func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.UseCase, vuc *view.UseCase, subuc *subscription.UseCase) *UseCase {
@@ -62,6 +65,7 @@ func New(db *gorm.DB, pool *pond.WorkerPool, viduc *video.UseCase, fuc *file.Use
 		ViewUseCase:         vuc,
 		SubscriptionUseCase: subuc,
 		MoviePool:           make(map[string]PoolItem),
+		Mutex:               &sync.RWMutex{},
 	}
 }
 
@@ -110,9 +114,11 @@ func (uc *UseCase) Delete(code string) error {
 		return err
 	}
 
+	uc.Mutex.RLock()
 	if poolItem, ok := uc.MoviePool[code]; ok {
 		poolItem.Cancel()
 	}
+	uc.Mutex.RUnlock()
 
 	err = uc.MovieInteractor.Delete(movie.ID)
 	if err != nil {
@@ -156,9 +162,11 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 
 	quality := video.GetQuality(1)
 
+	tmpFilePath := filepath.Join("upload/movies", movie.Code, "resize")
+	tmpFileName := quality.Code + ".mp4"
 	tmpFile, err := uc.FileUseCase.WriteFileFromSocket(
-		filepath.Join("upload/movies", movie.Code, "resize"),
-		quality.Code+".mp4",
+		tmpFilePath,
+		tmpFileName,
 		[]string{"video/mp4", "video/avi", "video/webm"},
 		header.Size,
 		conn,
@@ -169,9 +177,11 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 	}
 
 	ctx, cancel := context.WithCancel(context.TODO())
+	uc.Mutex.Lock()
 	uc.MoviePool[movie.Code] = PoolItem{ctx, cancel}
+	uc.Mutex.Unlock()
 
-	savedVideo, err := uc.VideoUseCase.Save(tmpFile.Name(), quality.ID)
+	savedVideo, err := uc.VideoUseCase.Save(ctx, tmpFile.Name(), tmpFileName, tmpFilePath, quality.ID)
 	if err != nil {
 		uc.Delete(movie.Code)
 		return err
@@ -188,7 +198,9 @@ func (uc *UseCase) UploadVideo(header *VideoUploadHeader, conn *websocket.Conn) 
 
 	uc.Pool.Submit(func() {
 		uc.PostProcessVideo(ctx, *movie, tmpFile)
+		uc.Mutex.Lock()
 		delete(uc.MoviePool, movie.Code)
+		uc.Mutex.Unlock()
 	})
 
 	return nil
@@ -231,10 +243,15 @@ func (uc *UseCase) RetryVideoPostProcess() {
 		movieCopy := movie
 
 		ctx, cancel := context.WithCancel(context.TODO())
+		uc.Mutex.RLock()
 		uc.MoviePool[movie.Code] = PoolItem{ctx, cancel}
+		uc.Mutex.RUnlock()
+
 		uc.Pool.Submit(func() {
 			uc.PostProcessVideo(ctx, movieCopy, tmpFile)
+			uc.Mutex.Lock()
 			delete(uc.MoviePool, movie.Code)
+			uc.Mutex.Unlock()
 		})
 	}
 }
@@ -300,15 +317,13 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 				continue
 			}
 
-			imageFile, _ := os.Open(filepath.Join(thumbsPath, item.Name()))
-			savedImageFile, _ := uc.FileUseCase.CreateFromPath(imageFile.Name(), "public")
+			imageFilePath := filepath.Join(thumbsPath, item.Name())
+			savedImageFile, _ := uc.FileUseCase.CreateFromPath(imageFilePath, item.Name(), thumbsPath, "public")
 			imagesFilePath = append(imagesFilePath, filepath.Join(thumbsWebvttPath, savedImageFile.Name))
 
 			if defaultPreviewPos == i+1 {
 				preview = savedImageFile
 			}
-
-			imageFile.Close()
 		}
 	}
 
@@ -328,7 +343,7 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 	if err != nil {
 		return err
 	}
-	savedVttFile, _ = uc.FileUseCase.CreateFromPath(vttFile.Name(), "public")
+	savedVttFile, _ = uc.FileUseCase.CreateFromPath(vttFile.Name(), "thumbs.vtt", thumbsPath, "public")
 
 	movieUpdateRequest := &VideoUpdateRequest{
 		Code:               movie.Code,
@@ -364,7 +379,7 @@ func (uc *UseCase) CreateResizedVideos(ctx context.Context, movie Movie, resized
 		}
 
 		resizedWebmPath = filepath.Join(resizedVideoPath, quality.Code+".mp4")
-		savedVideo, err = uc.VideoUseCase.Save(resizedWebmPath, quality.ID)
+		savedVideo, err = uc.VideoUseCase.Save(ctx, resizedWebmPath, quality.Code+".mp4", resizedVideoPath, quality.ID)
 		if err != nil {
 			return err
 		}
