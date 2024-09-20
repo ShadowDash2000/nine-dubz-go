@@ -63,7 +63,7 @@ func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType str
 		OriginalName: name,
 		Size:         size,
 		Path:         path,
-		FullPath:     filepath.Join(path, newFileName+extension),
+		FullPath:     filepath.Join(SaveFolderPrefix, path, newFileName+extension),
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
@@ -151,7 +151,7 @@ func (fr *Repository) CreateFromPath(filePath, name, path, fileType string) (*Fi
 			Extension:    extension,
 			OriginalName: name,
 			Size:         size,
-			Path:         path,
+			Path:         strings.TrimPrefix(path, SaveFolderPrefix),
 			FullPath:     filepath.Join(path, newFileName+extension),
 			Type:         fileType,
 		}
@@ -185,8 +185,8 @@ func (fr *Repository) CreateFromLocal(filePath, name, path, fileType string) (*F
 		Extension:    extension,
 		OriginalName: name,
 		Size:         fileInfo.Size(),
-		Path:         path,
-		FullPath:     filepath.Join(path, newFileName+extension),
+		Path:         strings.TrimPrefix(path, SaveFolderPrefix),
+		FullPath:     filePath,
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
@@ -227,6 +227,7 @@ func (fr *Repository) CreateMultipartInternal(ctx context.Context, filePath, nam
 		OriginalName: name,
 		Size:         size,
 		Path:         path,
+		FullPath:     filepath.Join(SaveFolderPrefix, path),
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
