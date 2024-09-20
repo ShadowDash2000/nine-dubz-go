@@ -333,7 +333,7 @@ func (uc *UseCase) CreateThumbnails(ctx context.Context, movie Movie, thumbsPath
 
 	if preview != nil {
 		previewWebp, _ = uc.FileUseCase.ImageToWebp(
-			preview.Path, preview.Name, thumbsPath,
+			preview.FullPath, preview.Name, thumbsPath,
 		)
 	}
 
