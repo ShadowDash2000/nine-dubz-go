@@ -1,25 +1,36 @@
 package file
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"gorm.io/gorm"
 	"io"
 	"io/fs"
 	"math/rand"
 	"net/http"
+	"nine-dubz/pkg/s3storage"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/pkg/errors"
+
+	"github.com/gorilla/websocket"
+	"gorm.io/gorm"
 )
 
 type Repository struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	S3Storage *s3storage.S3Storage
+	SaveType  string
 }
 
+const (
+	SaveTypeLocal    = "local"
+	SaveTypeInternal = "internal"
+)
 const SaveFolderPrefix = "upload/"
 
 func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType string) (*File, error) {
@@ -29,23 +40,142 @@ func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType str
 	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
 	extension := filepath.Ext(name)
 
-	err := os.MkdirAll(filepath.Join(SaveFolderPrefix, path), os.ModePerm)
-	if err != nil {
-		return nil, err
+	var size int64
+	var err error
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		size, err = fr.SaveLocal(file, path, newFileName, extension)
+		if err != nil {
+			return nil, errors.WithMessage(err, "File:")
+		}
+	case SaveTypeInternal:
+		size, err = fr.SaveInternal(file, path, newFileName, extension)
+		if err != nil {
+			return nil, errors.WithMessage(err, "File:")
+		}
+	default:
+		return nil, errors.New("File create: file save type is not specified")
 	}
 
-	f, err := os.Create(filepath.Join(SaveFolderPrefix, path, newFileName+extension))
+	savedFile := &File{
+		Name:         newFileName,
+		Extension:    extension,
+		OriginalName: name,
+		Size:         size,
+		Path:         path,
+		FullPath:     filepath.Join(path, newFileName+extension),
+		Type:         fileType,
+	}
+	result := fr.DB.Create(&savedFile)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	if fr.SaveType == SaveTypeInternal {
+		fr.DeleteLocal(savedFile)
+	}
+
+	return savedFile, nil
+}
+
+func (fr *Repository) SaveLocal(file io.ReadSeeker, path, name, extension string) (int64, error) {
+	err := os.MkdirAll(filepath.Join(SaveFolderPrefix, path), os.ModePerm)
 	if err != nil {
-		return nil, err
+		return 0, errors.WithMessage(err, "File:")
+	}
+
+	f, err := os.Create(filepath.Join(SaveFolderPrefix, path, name+extension))
+	if err != nil {
+		return 0, errors.WithMessage(err, "File:")
 	}
 	defer f.Close()
 
-	fileInfo, err := os.Stat(f.Name())
+	size, err := io.Copy(f, file)
 	if err != nil {
-		return nil, err
+		return 0, errors.WithMessage(err, "File:")
 	}
 
-	_, err = io.Copy(f, file)
+	return size, nil
+}
+
+func (fr *Repository) SaveInternal(file io.ReadSeeker, path, name, extension string) (int64, error) {
+	output, err := fr.S3Storage.PutObject(file, name+extension, path)
+	if err != nil {
+		return 0, errors.WithMessage(err, "File:")
+	}
+
+	contentLength := output.ResultMetadata.Get("Content-Length")
+	size, err := strconv.ParseInt(contentLength.(string), 10, 16)
+	if err != nil {
+		return 0, errors.WithMessage(err, "File:")
+	}
+
+	return size, nil
+}
+
+func (fr *Repository) CreateMultipart(ctx context.Context, filePath, name, path, fileType string) (*File, error) {
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		return fr.CreateFromLocal(filePath, name, path, fileType)
+	case SaveTypeInternal:
+		return fr.CreateMultipartInternal(ctx, filePath, name, path, fileType)
+	default:
+		return nil, errors.New("File create multipart: file save type is not specified")
+	}
+}
+
+func (fr *Repository) CreateFromPath(filePath, name, path, fileType string) (*File, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, errors.WithMessage(err, "File:")
+	}
+	defer file.Close()
+
+	timeNow := time.Now().UnixNano()
+	randomNumber := rand.Intn(1000)
+
+	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
+	extension := filepath.Ext(name)
+
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		return fr.CreateFromLocal(filePath, name, path, fileType)
+	case SaveTypeInternal:
+		size, err := fr.SaveInternal(file, path, newFileName, extension)
+		if err != nil {
+			return nil, errors.WithMessage(err, "File:")
+		}
+
+		savedFile := &File{
+			Name:         newFileName,
+			Extension:    extension,
+			OriginalName: name,
+			Size:         size,
+			Path:         path,
+			FullPath:     filepath.Join(path, newFileName+extension),
+			Type:         fileType,
+		}
+		result := fr.DB.Create(&savedFile)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+
+		fr.DeleteLocal(savedFile)
+
+		return savedFile, nil
+	default:
+		return nil, errors.New("File create multipart: file save type is not specified")
+	}
+}
+
+func (fr *Repository) CreateFromLocal(filePath, name, path, fileType string) (*File, error) {
+	timeNow := time.Now().UnixNano()
+	randomNumber := rand.Intn(1000)
+
+	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
+	extension := filepath.Ext(name)
+
+	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +185,8 @@ func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType str
 		Extension:    extension,
 		OriginalName: name,
 		Size:         fileInfo.Size(),
-		Path:         f.Name(),
+		Path:         path,
+		FullPath:     filepath.Join(path, newFileName+extension),
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
@@ -66,32 +197,45 @@ func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType str
 	return savedFile, nil
 }
 
-func (fr *Repository) CreateFromPath(path string, fileType string) (*File, error) {
+func (fr *Repository) CreateMultipartInternal(ctx context.Context, filePath, name, path, fileType string) (*File, error) {
+	var err error
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		file.Close()
+		if err == nil {
+			os.Remove(file.Name())
+		}
+	}()
+
 	timeNow := time.Now().UnixNano()
 	randomNumber := rand.Intn(1000)
-	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
 
-	fileInfo, err := os.Stat(path)
+	newFileName := fmt.Sprintf("%d%d", timeNow, randomNumber)
+	extension := filepath.Ext(name)
+
+	_, size, err := fr.S3Storage.MultipartUpload(ctx, file, newFileName+extension, path)
 	if err != nil {
 		return nil, err
 	}
 
-	extension := filepath.Ext(path)
-
 	savedFile := &File{
 		Name:         newFileName,
 		Extension:    extension,
-		OriginalName: fileInfo.Name(),
-		Size:         fileInfo.Size(),
+		OriginalName: name,
+		Size:         size,
 		Path:         path,
 		Type:         fileType,
 	}
 	result := fr.DB.Create(&savedFile)
 	if result.Error != nil {
-		return nil, result.Error
+		fr.S3Storage.DeleteObject(newFileName, path)
+		return nil, err
 	}
 
-	return savedFile, nil
+	return savedFile, result.Error
 }
 
 func (fr *Repository) Get(name string) ([]byte, error) {
@@ -100,21 +244,51 @@ func (fr *Repository) Get(name string) ([]byte, error) {
 		"type": "public",
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessage(err, "File:")
 	}
 
-	f, err := os.Open(file.Path)
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		return fr.ReadLocal(file)
+	case SaveTypeInternal:
+		return fr.ReadInternal(file)
+	default:
+		return nil, errors.New("File get: file save type is not specified")
+	}
+}
 
-	buff, err := io.ReadAll(f)
+func (fr *Repository) ReadLocal(file *File) ([]byte, error) {
+	f, err := os.Open(file.FullPath)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithMessage(err, "File read local:")
+	}
+	defer f.Close()
+
+	return io.ReadAll(f)
+}
+
+func (fr *Repository) ReadInternal(file *File) ([]byte, error) {
+	output, err := fr.S3Storage.GetObject(file.Name+file.Extension, file.Path)
+	if err != nil {
+		return nil, errors.WithMessage(err, "File read internal:")
 	}
 
-	return buff, nil
+	return io.ReadAll(output.Body)
 }
 
 func (fr *Repository) Stream(file *File, requestRange string) ([]byte, string, int, error) {
-	f, err := os.Open(file.Path)
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		return fr.StreamLocal(file, requestRange)
+	case SaveTypeInternal:
+		return fr.StreamInternal(file, requestRange)
+	default:
+		return nil, "", 0, errors.New("File stream: file save type is not specified")
+	}
+}
+
+func (fr *Repository) StreamLocal(file *File, requestRange string) ([]byte, string, int, error) {
+	f, err := os.Open(file.FullPath)
 	if err != nil {
 		return nil, "", 0, err
 	}
@@ -151,6 +325,32 @@ func (fr *Repository) Stream(file *File, requestRange string) ([]byte, string, i
 	return buff, contentRange, contentLength, nil
 }
 
+func (fr *Repository) StreamInternal(file *File, requestRange string) ([]byte, string, int, error) {
+	var offset int64
+	if len(requestRange) > 0 {
+		requestRange = strings.Replace(requestRange, "bytes=", "", -1)
+		requestRange = strings.Replace(requestRange, "-", "", -1)
+		offset, _ = strconv.ParseInt(requestRange, 10, 64)
+	} else {
+		offset = 0
+	}
+
+	buffSize := int64(1024 * 1024 * 5)
+	contentRange := "bytes=" + strconv.FormatInt(offset, 10) + "-" +
+		strconv.FormatInt(buffSize+offset, 10)
+	output, err := fr.S3Storage.GetRangeObject(file.Name+file.Extension, file.Path, contentRange)
+	if err != nil {
+		return nil, "", 0, err
+	}
+
+	contentRange = aws.ToString(output.ContentRange)
+	contentLength := int(aws.ToInt64(output.ContentLength))
+
+	buff, _ := io.ReadAll(output.Body)
+
+	return buff, contentRange, contentLength, nil
+}
+
 func (fr *Repository) Delete(name string) error {
 	file, err := fr.GetWhere(map[string]interface{}{"name": name})
 	if err != nil {
@@ -162,12 +362,23 @@ func (fr *Repository) Delete(name string) error {
 		return result.Error
 	}
 
-	err = os.Remove(file.Path)
-	if err != nil {
-		return err
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		return fr.DeleteLocal(file)
+	case SaveTypeInternal:
+		return fr.DeleteInternal(file)
+	default:
+		return errors.New("File delete: file save type is not specified")
 	}
+}
 
-	return result.Error
+func (fr *Repository) DeleteLocal(file *File) error {
+	return os.Remove(file.FullPath)
+}
+
+func (fr *Repository) DeleteInternal(file *File) error {
+	_, err := fr.S3Storage.DeleteObject(file.Name+file.Extension, file.Path)
+	return err
 }
 
 func (fr *Repository) DeleteMultiple(names []string) error {

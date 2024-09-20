@@ -2,12 +2,6 @@ package app
 
 import (
 	"fmt"
-	"github.com/alitto/pond"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/httprate"
-	"github.com/go-chi/render"
-	"gorm.io/gorm"
 	"log"
 	"net/http"
 	"nine-dubz/internal/comment"
@@ -29,6 +23,13 @@ import (
 	"nine-dubz/pkg/tokenauthorize"
 	"os"
 	"time"
+
+	"github.com/alitto/pond"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httprate"
+	"github.com/go-chi/render"
+	"gorm.io/gorm"
 )
 
 type App struct {

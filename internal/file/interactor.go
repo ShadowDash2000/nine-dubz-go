@@ -1,14 +1,17 @@
 package file
 
 import (
-	"github.com/gorilla/websocket"
+	"context"
 	"io"
 	"os"
+
+	"github.com/gorilla/websocket"
 )
 
 type Interactor interface {
 	Create(file io.ReadSeeker, name, path string, fileType string) (*File, error)
-	CreateFromPath(path string, fileType string) (*File, error)
+	CreateMultipart(ctx context.Context, filePath, name, path, fileType string) (*File, error)
+	CreateFromPath(filePath, name, path, fileType string) (*File, error)
 	Get(name string) ([]byte, error)
 	Stream(file *File, requestRange string) ([]byte, string, int, error)
 	Delete(name string) error
