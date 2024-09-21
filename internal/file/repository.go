@@ -420,7 +420,7 @@ func (fr *Repository) DeleteAllInPath(path string) error {
 
 func (fr *Repository) DeleteAllInPathLocal(path string) error {
 	var paths []string
-	err := filepath.Walk(filepath.Join(SaveFolderPrefix, path), func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -439,12 +439,7 @@ func (fr *Repository) DeleteAllInPathLocal(path string) error {
 		return result.Error
 	}
 
-	err = os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
-	if err != nil {
-		return err
-	}
-
-	return os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
+	return os.RemoveAll(path)
 }
 
 func (fr *Repository) DeleteAllInPathInternal(path string) error {
