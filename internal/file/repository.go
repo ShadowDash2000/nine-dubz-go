@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/rand"
 	"net/http"
 	"nine-dubz/pkg/s3storage"
@@ -418,20 +419,29 @@ func (fr *Repository) DeleteAllInPath(path string) error {
 }
 
 func (fr *Repository) DeleteAllInPathLocal(path string) error {
-	files := []File{}
-	result := fr.DB.Unscoped().Where("path LIKE ?", "%"+path+"%").Find(&files)
-	if result.Error != nil {
-		return result.Error
-	}
-
 	var paths []string
-	for _, file := range files {
-		paths = append(paths, file.FullPath)
+	err := filepath.Walk(filepath.Join(SaveFolderPrefix, path), func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
-	result = fr.DB.Unscoped().Delete(&File{}, map[string]interface{}{"full_path": paths})
+	result := fr.DB.Unscoped().Delete(&File{}, map[string]interface{}{"full_path": paths})
 	if result.Error != nil {
 		return result.Error
+	}
+
+	err = os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
+	if err != nil {
+		return err
 	}
 
 	return os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
