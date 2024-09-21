@@ -9,6 +9,7 @@ import (
 )
 
 type Interactor interface {
+	GetSaveType() SaveType
 	Create(file io.ReadSeeker, name, path string, fileType string) (*File, error)
 	CreateMultipart(ctx context.Context, filePath, name, path, fileType string) (*File, error)
 	CreateFromPath(filePath, name, path, fileType string) (*File, error)

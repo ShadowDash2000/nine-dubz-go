@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -103,7 +105,7 @@ func (sr *S3Storage) MultipartUpload(ctx context.Context, file io.ReadSeeker, ke
 	buff := make([]byte, chunkSize)
 	for {
 		n, err := file.Read(buff)
-		if err != nil && n < 0 {
+		if err != nil {
 			if err == io.EOF {
 				break
 			}
@@ -217,17 +219,29 @@ func (sr *S3Storage) DeleteAllInPrefix(prefix string) (*s3.DeleteObjectsOutput, 
 		return nil, err
 	}
 
-	listObject, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-		Bucket: aws.String(sr.Bucket),
-		Prefix: aws.String(prefixPath),
-	})
-	if err != nil {
-		return nil, err
-	}
-
+	directories := []string{prefixPath}
 	var objects []types.ObjectIdentifier
-	for _, object := range listObject.Contents {
-		objects = append(objects, types.ObjectIdentifier{Key: object.Key})
+	for len(directories) > 0 {
+		for key, prefix := range directories {
+			directories = slices.Delete(directories, key, 1)
+
+			listObject, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+				Bucket: aws.String(sr.Bucket),
+				Prefix: aws.String(prefix),
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			for _, object := range listObject.Contents {
+				if strings.HasSuffix(*object.Key, "/") {
+					directories = append(directories, *object.Key)
+					continue
+				}
+
+				objects = append(objects, types.ObjectIdentifier{Key: object.Key})
+			}
+		}
 	}
 
 	deleteObjects, err := client.DeleteObjects(context.TODO(), &s3.DeleteObjectsInput{

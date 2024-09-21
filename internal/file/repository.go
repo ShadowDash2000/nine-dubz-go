@@ -1,10 +1,10 @@
 package file
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"math/rand"
 	"net/http"
 	"nine-dubz/pkg/s3storage"
@@ -24,14 +24,20 @@ import (
 type Repository struct {
 	DB        *gorm.DB
 	S3Storage *s3storage.S3Storage
-	SaveType  string
+	SaveType  SaveType
 }
 
+type SaveType string
+
 const (
-	SaveTypeLocal    = "local"
-	SaveTypeInternal = "internal"
+	SaveTypeLocal    SaveType = "local"
+	SaveTypeInternal SaveType = "internal"
 )
 const SaveFolderPrefix = "upload/"
+
+func (fr *Repository) GetSaveType() SaveType {
+	return fr.SaveType
+}
 
 func (fr *Repository) Create(file io.ReadSeeker, name, path string, fileType string) (*File, error) {
 	timeNow := time.Now().UnixNano()
@@ -99,18 +105,15 @@ func (fr *Repository) SaveLocal(file io.ReadSeeker, path, name, extension string
 }
 
 func (fr *Repository) SaveInternal(file io.ReadSeeker, path, name, extension string) (int64, error) {
-	output, err := fr.S3Storage.PutObject(file, name+extension, path)
+	_, err := fr.S3Storage.PutObject(file, name+extension, path)
 	if err != nil {
 		return 0, errors.WithMessage(err, "File:")
 	}
 
-	contentLength := output.ResultMetadata.Get("Content-Length")
-	size, err := strconv.ParseInt(contentLength.(string), 10, 16)
-	if err != nil {
-		return 0, errors.WithMessage(err, "File:")
-	}
+	buff := new(bytes.Buffer)
+	buff.ReadFrom(file)
 
-	return size, nil
+	return int64(buff.Len()), nil
 }
 
 func (fr *Repository) CreateMultipart(ctx context.Context, filePath, name, path, fileType string) (*File, error) {
@@ -152,15 +155,13 @@ func (fr *Repository) CreateFromPath(filePath, name, path, fileType string) (*Fi
 			OriginalName: name,
 			Size:         size,
 			Path:         strings.TrimPrefix(path, SaveFolderPrefix),
-			FullPath:     filepath.Join(path, newFileName+extension),
+			FullPath:     filePath,
 			Type:         fileType,
 		}
 		result := fr.DB.Create(&savedFile)
 		if result.Error != nil {
 			return nil, result.Error
 		}
-
-		fr.DeleteLocal(savedFile)
 
 		return savedFile, nil
 	default:
@@ -203,12 +204,7 @@ func (fr *Repository) CreateMultipartInternal(ctx context.Context, filePath, nam
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		file.Close()
-		if err == nil {
-			os.Remove(file.Name())
-		}
-	}()
+	defer file.Close()
 
 	timeNow := time.Now().UnixNano()
 	randomNumber := rand.Intn(1000)
@@ -226,7 +222,7 @@ func (fr *Repository) CreateMultipartInternal(ctx context.Context, filePath, nam
 		Extension:    extension,
 		OriginalName: name,
 		Size:         size,
-		Path:         path,
+		Path:         strings.TrimPrefix(path, SaveFolderPrefix),
 		FullPath:     filepath.Join(SaveFolderPrefix, path),
 		Type:         fileType,
 	}
@@ -269,7 +265,7 @@ func (fr *Repository) ReadLocal(file *File) ([]byte, error) {
 }
 
 func (fr *Repository) ReadInternal(file *File) ([]byte, error) {
-	output, err := fr.S3Storage.GetObject(file.Name+file.Extension, file.Path)
+	output, err := fr.S3Storage.GetObject(file.Name+file.Extension, filepath.Join(SaveFolderPrefix, file.Path))
 	if err != nil {
 		return nil, errors.WithMessage(err, "File read internal:")
 	}
@@ -339,7 +335,7 @@ func (fr *Repository) StreamInternal(file *File, requestRange string) ([]byte, s
 	buffSize := int64(1024 * 1024 * 5)
 	contentRange := "bytes=" + strconv.FormatInt(offset, 10) + "-" +
 		strconv.FormatInt(buffSize+offset, 10)
-	output, err := fr.S3Storage.GetRangeObject(file.Name+file.Extension, file.Path, contentRange)
+	output, err := fr.S3Storage.GetRangeObject(file.Name+file.Extension, filepath.Join(SaveFolderPrefix, file.Path), contentRange)
 	if err != nil {
 		return nil, "", 0, err
 	}
@@ -405,28 +401,45 @@ func (fr *Repository) DeleteMultiple(names []string) error {
 }
 
 func (fr *Repository) DeleteAllInPath(path string) error {
-	var paths []string
-	err := filepath.Walk(filepath.Join(SaveFolderPrefix, path), func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	path = filepath.Join(SaveFolderPrefix, path)
 
-		if !info.IsDir() {
-			paths = append(paths, path)
-		}
-		return nil
-	})
+	switch fr.SaveType {
+	case SaveTypeLocal:
+		return fr.DeleteAllInPathLocal(path)
+	case SaveTypeInternal:
+		return fr.DeleteAllInPathInternal(path)
+	default:
+		return errors.New("File delete all in path: file save type is not specified")
+	}
+}
 
-	result := fr.DB.Unscoped().Delete(&File{}, map[string]interface{}{"path": paths})
+func (fr *Repository) DeleteAllInPathLocal(path string) error {
+	files := []File{}
+	result := fr.DB.Unscoped().Where("path LIKE ?", "%"+path+"%").Find(&files)
 	if result.Error != nil {
 		return result.Error
 	}
 
-	err = os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
+	var paths []string
+	for _, file := range files {
+		paths = append(paths, file.FullPath)
+	}
+
+	result = fr.DB.Unscoped().Delete(&File{}, map[string]interface{}{"full_path": paths})
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return os.RemoveAll(filepath.Join(SaveFolderPrefix, path))
+}
+
+func (fr *Repository) DeleteAllInPathInternal(path string) error {
+	_, err := fr.S3Storage.DeleteAllInPrefix(path)
 	if err != nil {
 		return err
 	}
 
+	result := fr.DB.Unscoped().Where("path LIKE ?", "%"+path+"%").Delete(&File{})
 	return result.Error
 }
 
