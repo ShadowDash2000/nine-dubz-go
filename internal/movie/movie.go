@@ -284,6 +284,10 @@ func (uc *UseCase) PostProcessVideo(ctx context.Context, movie Movie, tmpFile *o
 
 	}*/
 
+	if uc.FileUseCase.GetSaveType() == file.SaveTypeInternal {
+		os.RemoveAll(filepath.Join("upload/movies", movie.Code))
+	}
+
 	return nil
 }
 

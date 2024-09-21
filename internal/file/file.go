@@ -37,7 +37,7 @@ func New(db *gorm.DB) *UseCase {
 		FileInteractor: &Repository{
 			DB:        db,
 			S3Storage: s3storage.NewS3Storage(),
-			SaveType:  saveType,
+			SaveType:  SaveType(saveType),
 		},
 		IsDev: isDev,
 	}
@@ -56,6 +56,10 @@ func (uc *UseCase) UpgradeConnection(w http.ResponseWriter, r *http.Request) (*w
 	}
 
 	return connection, nil
+}
+
+func (uc *UseCase) GetSaveType() SaveType {
+	return uc.FileInteractor.GetSaveType()
 }
 
 func (uc *UseCase) Create(file io.ReadSeeker, name, path string, fileType string) (*File, error) {
@@ -118,11 +122,5 @@ func (uc *UseCase) ImageToWebp(imagePath, name, savePath string) (*File, error) 
 		return nil, err
 	}
 
-	file, err := os.Open(filepath.Join(savePath, name+".webp"))
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	return uc.Create(file, name+".webp", savePath, "public")
+	return uc.CreateFromPath(filepath.Join(savePath, name+".webp"), name+".webp", savePath, "public")
 }
