@@ -105,7 +105,7 @@ func (fr *Repository) SaveLocal(file io.ReadSeeker, path, name, extension string
 }
 
 func (fr *Repository) SaveInternal(file io.ReadSeeker, path, name, extension string) (int64, error) {
-	_, err := fr.S3Storage.PutObject(file, name+extension, path)
+	_, err := fr.S3Storage.PutObject(file, name+extension, filepath.Join(SaveFolderPrefix, path))
 	if err != nil {
 		return 0, errors.WithMessage(err, "File:")
 	}
