@@ -11,3 +11,5 @@ Back-end for the [Nine-Dubz](https://nine-dubz.ru/) website.
 - SEO and video meta-data for embedded links
 
 [Front-end repository](https://github.com/UsGitHu611/nine-dubz-frontend)
+
+"Вот это парень ты не плохо придумал, так держать!" ☝☝☝
