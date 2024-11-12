@@ -107,19 +107,10 @@ func NewGetMultipleSubCommentResponse(comments *[]Comment) *[]GetSubCommentRespo
 	return &commentsResponse
 }
 
-type GetMultipleResponse struct {
-	CommentsCount int64         `json:"commentsCount"`
-	Comments      []GetResponse `json:"comments"`
-}
-
-func NewGetMultipleResponse(comments *[]Comment, commentsCount int64) *GetMultipleResponse {
-	var commentsResponse GetMultipleResponse
+func NewGetMultipleResponse(comments *[]Comment) *[]GetResponse {
+	var commentsResponse []GetResponse
 	for _, comment := range *comments {
-		commentsResponse.Comments = append(commentsResponse.Comments, *NewGetResponse(&comment))
-	}
-
-	if commentsCount > 0 {
-		commentsResponse.CommentsCount = commentsCount
+		commentsResponse = append(commentsResponse, *NewGetResponse(&comment))
 	}
 
 	return &commentsResponse
