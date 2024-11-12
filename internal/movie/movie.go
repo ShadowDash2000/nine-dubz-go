@@ -461,7 +461,7 @@ func (uc *UseCase) UpdateByUserId(userId uint, movie *UpdateRequest) error {
 		if previewFileType == "image/gif" {
 			movieRequest.PreviewWebpId = &preview.ID
 		} else {
-			previewWebp, err := uc.FileUseCase.ImageToWebp(preview.Path, preview.Name, "upload/"+previewSavePath)
+			previewWebp, err := uc.FileUseCase.ImageToWebp(preview.FullPath, preview.Name, "upload/"+previewSavePath)
 			if err == nil {
 				movieRequest.PreviewWebpId = &previewWebp.ID
 			}
