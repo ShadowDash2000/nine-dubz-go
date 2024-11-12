@@ -123,7 +123,7 @@ func (uc *UseCase) GetMultipleSubComments(userId *uint, movieCode string, parent
 	return NewGetMultipleSubCommentResponse(&comments), nil
 }
 
-func (uc *UseCase) GetMultiple(userId *uint, movieCode string, pagination *pagination.Pagination, sort *sorting.Sort) (*GetMultipleResponse, error) {
+func (uc *UseCase) GetMultiple(userId *uint, movieCode string, pagination *pagination.Pagination, sort *sorting.Sort) (*[]GetResponse, error) {
 	if pagination.Limit > 20 || pagination.Limit == -1 {
 		pagination.Limit = 20
 	}
@@ -151,14 +151,6 @@ func (uc *UseCase) GetMultiple(userId *uint, movieCode string, pagination *pagin
 	}
 
 	if len(comments) == 0 {
-		return nil, err
-	}
-
-	commentsCount, err := uc.CommentInteractor.Count(map[string]interface{}{
-		"movie_id":  movieResponse.ID,
-		"parent_id": nil,
-	})
-	if err != nil {
 		return nil, err
 	}
 
@@ -193,7 +185,7 @@ func (uc *UseCase) GetMultiple(userId *uint, movieCode string, pagination *pagin
 		return nil, errors.New("comment: error while formatting comments")
 	}
 
-	return NewGetMultipleResponse(&comments, commentsCount), nil
+	return NewGetMultipleResponse(&comments), nil
 }
 
 func (uc *UseCase) Format(comments *[]Comment) error {
